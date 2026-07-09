@@ -17,10 +17,21 @@ function makeEvent(db, overrides = {}) {
 }
 
 function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage, thread }) {
+  // Mirrors real discord.js behavior: an optional field left blank is
+  // omitted from the submission entirely, so getTextInputValue throws.
+  const fieldEntries = new Map(Object.entries(fieldValues).map(([id, value]) => [id, { value }]));
   return {
     customId: `join-modal:${eventId}:${className}`,
     user: { id: userId, username: userId },
-    fields: { getTextInputValue: (id) => fieldValues[id] },
+    fields: {
+      getTextInputValue: (id) => {
+        if (!fieldEntries.has(id)) {
+          throw new Error(`Required field with custom id "${id}" not found.`);
+        }
+        return fieldEntries.get(id).value;
+      },
+      fields: fieldEntries,
+    },
     deferUpdate: jest.fn(async () => {}),
     deleteReply: jest.fn(async () => {}),
     followUp: jest.fn(async () => {}),
@@ -60,7 +71,7 @@ describe('handleJoinModal', () => {
     expect(signup.note).toBe('本尊的小號');
   });
 
-  test('signs up fine with no note provided', async () => {
+  test('signs up fine when the optional note field is omitted entirely (left blank)', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -69,7 +80,7 @@ describe('handleJoinModal', () => {
       eventId: event.id,
       className: '冰雷',
       userId: 'user-1',
-      fieldValues: { level: '70', game_id: 'alice#1', note: '' },
+      fieldValues: { level: '70', game_id: 'alice#1' },
       fetchedMessage: editedMessage,
       thread,
     });

@@ -1,6 +1,14 @@
 const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 
+// An optional TextInput left blank is omitted from the modal submission
+// entirely, so ModalSubmitFields#getTextInputValue throws for it instead
+// of returning an empty string. This reads it safely.
+function getOptionalTextInputValue(fields, customId) {
+  const field = fields.fields.get(customId);
+  return field ? field.value : '';
+}
+
 async function handleJoinModal(interaction, db) {
   const [, eventIdRaw, className] = interaction.customId.split(':');
   const eventId = Number.parseInt(eventIdRaw, 10);
@@ -19,7 +27,7 @@ async function handleJoinModal(interaction, db) {
 
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
-  const note = interaction.fields.getTextInputValue('note');
+  const note = getOptionalTextInputValue(interaction.fields, 'note');
 
   const result = addSignup(db, event, {
     userId: interaction.user.id,
