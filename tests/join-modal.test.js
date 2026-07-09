@@ -30,7 +30,7 @@ function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessa
 }
 
 describe('handleJoinModal', () => {
-  test('deletes the class-picker message, adds the signup, edits the message, and posts to the thread', async () => {
+  test('deletes the class-picker message, adds the signup, edits the message, posts to the thread, and sends no extra confirmation', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -52,7 +52,7 @@ describe('handleJoinModal', () => {
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
+    expect(interaction.followUp).not.toHaveBeenCalled();
 
     const [signup] = getSignups(db, event.id);
     expect(signup.class).toBe('冰雷');
