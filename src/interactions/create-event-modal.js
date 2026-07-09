@@ -1,6 +1,7 @@
 const { createEvent, updateEventMessageId, updateEventThreadId } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
+const { tryAcknowledgeAndDeleteReply } = require('./ack');
 
 const START_TIME_PATTERN = /^(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2})$/;
 
@@ -23,17 +24,19 @@ async function handleCreateEventModal(interaction, db) {
   const startTime = interaction.fields.getTextInputValue('start_time');
   const capacity = TITLE_CAPACITIES[title];
 
-  // Deleting the title-picker message this modal was launched from requires
-  // claiming it via deferUpdate() first, then deleteReply(); after that,
-  // every further response must go through followUp() instead of reply().
-  await interaction.deferUpdate();
-  await interaction.deleteReply();
+  // If the ack fails (stale interaction), we can no longer message the user
+  // via this interaction, but the event itself must still be created — that
+  // doesn't depend on this interaction's token. The announcement is posted
+  // via interaction.channel.send() rather than followUp() for the same reason.
+  const acked = await tryAcknowledgeAndDeleteReply(interaction);
 
   if (!isValidStartTime(startTime)) {
-    await interaction.followUp({
-      content: '時間格式錯誤，請用「月/日 時:分」的格式重新使用 /揪團 建立，例如 7/12 20:00',
-      ephemeral: true,
-    });
+    if (acked) {
+      await interaction.followUp({
+        content: '時間格式錯誤，請用「月/日 時:分」的格式重新使用 /揪團 建立，例如 7/12 20:00',
+        ephemeral: true,
+      });
+    }
     return;
   }
 
@@ -50,7 +53,7 @@ async function handleCreateEventModal(interaction, db) {
   const embed = buildEventEmbed(event, []);
   const row = buildActionRow(event, 0);
 
-  const message = await interaction.followUp({ embeds: [embed], components: [row] });
+  const message = await interaction.channel.send({ embeds: [embed], components: [row] });
   updateEventMessageId(db, event.id, message.id);
 
   const thread = await message.startThread({ name: title.slice(0, 100) });

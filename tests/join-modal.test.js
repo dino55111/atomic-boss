@@ -16,7 +16,7 @@ function makeEvent(db, overrides = {}) {
   return event;
 }
 
-function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage, thread }) {
+function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage, thread, deferUpdateFails = false }) {
   // Mirrors real discord.js behavior: an optional field left blank is
   // omitted from the submission entirely, so getTextInputValue throws.
   const fieldEntries = new Map(Object.entries(fieldValues).map(([id, value]) => [id, { value }]));
@@ -32,7 +32,11 @@ function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessa
       },
       fields: fieldEntries,
     },
-    deferUpdate: jest.fn(async () => {}),
+    deferUpdate: jest.fn(async () => {
+      if (deferUpdateFails) {
+        throw new Error('Unknown interaction');
+      }
+    }),
     deleteReply: jest.fn(async () => {}),
     followUp: jest.fn(async () => {}),
     channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
@@ -89,6 +93,32 @@ describe('handleJoinModal', () => {
 
     const [signup] = getSignups(db, event.id);
     expect(signup.note).toBe('');
+  });
+
+  test('still records the signup and updates the roster when the interaction ack fails (stale interaction)', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 2 });
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeInteraction({
+      eventId: event.id,
+      className: '冰雷',
+      userId: 'user-1',
+      fieldValues: { level: '70', game_id: 'alice#1' },
+      fetchedMessage: editedMessage,
+      thread,
+      deferUpdateFails: true,
+    });
+
+    await handleJoinModal(interaction, db);
+
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+    expect(interaction.followUp).not.toHaveBeenCalled();
+    expect(editedMessage.edit).toHaveBeenCalledTimes(1);
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.class).toBe('冰雷');
   });
 
   test('deletes the class-picker message and replies with a follow-up when the user already signed up', async () => {

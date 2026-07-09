@@ -1,19 +1,26 @@
 const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
-function makeInteraction({ title, startTime }) {
+function makeInteraction({ title, startTime, deferUpdateFails = false }) {
   return {
     customId: `create-event-modal:${title}`,
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
     fields: { getTextInputValue: () => startTime },
-    deferUpdate: jest.fn(async () => {}),
+    deferUpdate: jest.fn(async () => {
+      if (deferUpdateFails) {
+        throw new Error('Unknown interaction');
+      }
+    }),
     deleteReply: jest.fn(async () => {}),
-    followUp: jest.fn(async () => ({
-      id: 'message-1',
-      startThread: jest.fn(async () => ({ id: 'thread-1' })),
-    })),
+    followUp: jest.fn(async () => {}),
+    channel: {
+      send: jest.fn(async () => ({
+        id: 'message-1',
+        startThread: jest.fn(async () => ({ id: 'thread-1' })),
+      })),
+    },
   };
 }
 
@@ -37,7 +44,7 @@ describe('isValidStartTime', () => {
 });
 
 describe('handleCreateEventModal', () => {
-  test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed', async () => {
+  test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed to the channel', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00' });
 
@@ -45,10 +52,10 @@ describe('handleCreateEventModal', () => {
 
     expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
-    expect(interaction.followUp).toHaveBeenCalledTimes(1);
-    const followUpPayload = interaction.followUp.mock.calls[0][0];
-    expect(followUpPayload.embeds).toHaveLength(1);
-    expect(followUpPayload.components).toHaveLength(1);
+    expect(interaction.channel.send).toHaveBeenCalledTimes(1);
+    const sentPayload = interaction.channel.send.mock.calls[0][0];
+    expect(sentPayload.embeds).toHaveLength(1);
+    expect(sentPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
     expect(event).toMatchObject({ title: '普拉', capacity: 6, message_id: 'message-1', thread_id: 'thread-1' });
@@ -74,5 +81,19 @@ describe('handleCreateEventModal', () => {
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
     expect(getEventById(db, 1)).toBeUndefined();
+  });
+
+  test('still creates the event and posts the embed when the interaction ack fails (stale interaction)', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00', deferUpdateFails: true });
+
+    await handleCreateEventModal(interaction, db);
+
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+    expect(interaction.followUp).not.toHaveBeenCalled();
+    expect(interaction.channel.send).toHaveBeenCalledTimes(1);
+
+    const event = getEventById(db, 1);
+    expect(event).toMatchObject({ title: '普拉', capacity: 6 });
   });
 });
