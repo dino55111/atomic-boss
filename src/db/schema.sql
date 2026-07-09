@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS signups (
   class         TEXT NOT NULL,
   level         TEXT NOT NULL,
   game_id       TEXT NOT NULL,
+  note          TEXT NOT NULL DEFAULT '',
   signed_at     TEXT NOT NULL,
   UNIQUE(event_id, user_id)
 );

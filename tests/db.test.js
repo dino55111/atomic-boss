@@ -65,10 +65,22 @@ describe('db', () => {
   test('addSignup adds a signup and countSignups reflects it', () => {
     const db = makeTestDb();
     const event = makeTestEvent(db);
-    const result = addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+    const result = addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1', note: '本尊的小號' });
     expect(result).toBe(ADD_SIGNUP_OK);
     expect(countSignups(db, event.id)).toBe(1);
     expect(hasSignedUp(db, event.id, 'user-1')).toBe(true);
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.note).toBe('本尊的小號');
+  });
+
+  test('addSignup defaults note to an empty string when omitted', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.note).toBe('');
   });
 
   test('addSignup returns DUPLICATE when the same user signs up twice', () => {

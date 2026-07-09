@@ -39,7 +39,7 @@ describe('handleJoinModal', () => {
       eventId: event.id,
       className: '冰雷',
       userId: 'user-1',
-      fieldValues: { level: '70', game_id: 'alice#1' },
+      fieldValues: { level: '70', game_id: 'alice#1', note: '本尊的小號' },
       fetchedMessage: editedMessage,
       thread,
     });
@@ -52,10 +52,32 @@ describe('handleJoinModal', () => {
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('本尊的小號'));
     expect(interaction.followUp).not.toHaveBeenCalled();
 
     const [signup] = getSignups(db, event.id);
     expect(signup.class).toBe('冰雷');
+    expect(signup.note).toBe('本尊的小號');
+  });
+
+  test('signs up fine with no note provided', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 2 });
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeInteraction({
+      eventId: event.id,
+      className: '冰雷',
+      userId: 'user-1',
+      fieldValues: { level: '70', game_id: 'alice#1', note: '' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleJoinModal(interaction, db);
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.note).toBe('');
   });
 
   test('deletes the class-picker message and replies with a follow-up when the user already signed up', async () => {

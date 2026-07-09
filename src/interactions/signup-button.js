@@ -48,9 +48,17 @@ function buildJoinDetailsModal(eventId, className) {
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
+  const noteInput = new TextInputBuilder()
+    .setCustomId('note')
+    .setLabel('備註')
+    .setPlaceholder('可以填 XXX 的小號')
+    .setStyle(TextInputStyle.Short)
+    .setRequired(false);
+
   modal.addComponents(
     new ActionRowBuilder().addComponents(levelInput),
     new ActionRowBuilder().addComponents(gameIdInput),
+    new ActionRowBuilder().addComponents(noteInput),
   );
 
   return modal;

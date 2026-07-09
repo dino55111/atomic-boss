@@ -4,7 +4,10 @@ function buildEventEmbed(event, signups) {
   const roster = signups.length === 0
     ? '目前尚無人報名'
     : signups
-        .map((s, i) => `${i + 1}. <@${s.user_id}>（職業：${s.class}／等級：${s.level}／ID：${s.game_id}）`)
+        .map((s, i) => {
+          const noteSegment = s.note ? `／備註：${s.note}` : '';
+          return `${i + 1}. <@${s.user_id}>（職業：${s.class}／等級：${s.level}／ID：${s.game_id}${noteSegment}）`;
+        })
         .join('\n');
 
   return new EmbedBuilder()

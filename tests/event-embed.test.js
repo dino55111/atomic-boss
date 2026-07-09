@@ -10,13 +10,27 @@ describe('buildEventEmbed', () => {
   });
 
   test('lists each signup with class, level and game id', () => {
-    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1' }];
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1', note: '' }];
     const embed = buildEventEmbed(baseEvent, signups);
     const rosterField = embed.data.fields.find((f) => f.name === '名單');
     expect(rosterField.value).toContain('<@user-1>');
     expect(rosterField.value).toContain('戰士');
     expect(rosterField.value).toContain('70');
     expect(rosterField.value).toContain('alice#1');
+  });
+
+  test('appends the note when present', () => {
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1', note: '本尊的小號' }];
+    const embed = buildEventEmbed(baseEvent, signups);
+    const rosterField = embed.data.fields.find((f) => f.name === '名單');
+    expect(rosterField.value).toContain('本尊的小號');
+  });
+
+  test('omits any note segment when the note is empty', () => {
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1', note: '' }];
+    const embed = buildEventEmbed(baseEvent, signups);
+    const rosterField = embed.data.fields.find((f) => f.name === '名單');
+    expect(rosterField.value).not.toContain('備註');
   });
 
   test('shows current count over capacity', () => {

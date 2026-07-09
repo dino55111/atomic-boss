@@ -50,7 +50,7 @@ const ADD_SIGNUP_OK = 'OK';
 const ADD_SIGNUP_FULL = 'FULL';
 const ADD_SIGNUP_DUPLICATE = 'DUPLICATE';
 
-function addSignup(db, event, { userId, displayName, className, level, gameId }) {
+function addSignup(db, event, { userId, displayName, className, level, gameId, note = '' }) {
   const transaction = db.transaction(() => {
     if (hasSignedUp(db, event.id, userId)) {
       return ADD_SIGNUP_DUPLICATE;
@@ -59,8 +59,8 @@ function addSignup(db, event, { userId, displayName, className, level, gameId })
       return ADD_SIGNUP_FULL;
     }
     db.prepare(`
-      INSERT INTO signups (event_id, user_id, display_name, class, level, game_id, signed_at)
-      VALUES (@eventId, @userId, @displayName, @className, @level, @gameId, @signedAt)
+      INSERT INTO signups (event_id, user_id, display_name, class, level, game_id, note, signed_at)
+      VALUES (@eventId, @userId, @displayName, @className, @level, @gameId, @note, @signedAt)
     `).run({
       eventId: event.id,
       userId,
@@ -68,6 +68,7 @@ function addSignup(db, event, { userId, displayName, className, level, gameId })
       className,
       level,
       gameId,
+      note,
       signedAt: new Date().toISOString(),
     });
     return ADD_SIGNUP_OK;

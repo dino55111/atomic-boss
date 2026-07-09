@@ -19,6 +19,7 @@ async function handleJoinModal(interaction, db) {
 
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
+  const note = interaction.fields.getTextInputValue('note');
 
   const result = addSignup(db, event, {
     userId: interaction.user.id,
@@ -26,6 +27,7 @@ async function handleJoinModal(interaction, db) {
     className,
     level,
     gameId,
+    note,
   });
 
   if (result === ADD_SIGNUP_DUPLICATE) {
@@ -44,8 +46,9 @@ async function handleJoinModal(interaction, db) {
   const message = await interaction.channel.messages.fetch(event.message_id);
   await message.edit({ embeds: [embed], components: [row] });
 
+  const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}）`);
+  await thread.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}）`);
 }
 
 module.exports = { handleJoinModal };
