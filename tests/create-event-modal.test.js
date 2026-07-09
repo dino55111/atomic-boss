@@ -8,7 +8,7 @@ function makeInteraction(fieldValues) {
     user: { id: 'creator-1' },
     fields: {
       getTextInputValue: (id) => fieldValues[id],
-      getRadioGroup: (id) => fieldValues[id],
+      getStringSelectValues: (id) => [fieldValues[id]],
     },
     reply: jest.fn(async () => {}),
     fetchReply: jest.fn(async () => ({

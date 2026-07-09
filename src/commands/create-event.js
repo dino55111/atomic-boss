@@ -4,7 +4,7 @@ const {
   LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
-  RadioGroupBuilder,
+  StringSelectMenuBuilder,
 } = require('discord.js');
 
 const TITLE_OPTIONS = ['普拉', '普炎', '困拉', '龍王', '蝴蝶王'];
@@ -18,14 +18,17 @@ async function execute(interaction) {
     .setCustomId('create-event-modal')
     .setTitle('建立揪團');
 
-  const titleRadioGroup = new RadioGroupBuilder()
+  const titleSelect = new StringSelectMenuBuilder()
     .setCustomId('title')
+    .setPlaceholder('請選擇標題')
+    .setMinValues(1)
+    .setMaxValues(1)
     .setRequired(true)
     .addOptions(TITLE_OPTIONS.map((title) => ({ label: title, value: title })));
 
   const titleLabel = new LabelBuilder()
     .setLabel('標題')
-    .setRadioGroupComponent(titleRadioGroup);
+    .setStringSelectMenuComponent(titleSelect);
 
   const capacityInput = new TextInputBuilder()
     .setCustomId('capacity')

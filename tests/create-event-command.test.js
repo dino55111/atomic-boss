@@ -16,7 +16,7 @@ describe('create-event command', () => {
     expect(modal.components).toHaveLength(3);
   });
 
-  test('標題 field is a required radio group offering all title options', async () => {
+  test('標題 field is a required single-select offering all title options', async () => {
     const interaction = { showModal: jest.fn() };
     await execute(interaction);
 
@@ -24,11 +24,13 @@ describe('create-event command', () => {
     const titleLabel = modal.components[0];
     expect(titleLabel.data.label).toBe('標題');
 
-    const titleRadioGroup = titleLabel.data.component;
-    expect(titleRadioGroup.data.type).toBe(ComponentType.RadioGroup);
-    expect(titleRadioGroup.data.custom_id).toBe('title');
-    expect(titleRadioGroup.data.required).toBe(true);
-    expect(titleRadioGroup.options.map((option) => option.data.value)).toEqual(TITLE_OPTIONS);
+    const titleSelect = titleLabel.data.component;
+    expect(titleSelect.data.type).toBe(ComponentType.StringSelect);
+    expect(titleSelect.data.custom_id).toBe('title');
+    expect(titleSelect.data.required).toBe(true);
+    expect(titleSelect.data.min_values).toBe(1);
+    expect(titleSelect.data.max_values).toBe(1);
+    expect(titleSelect.options.map((option) => option.data.value)).toEqual(TITLE_OPTIONS);
   });
 
   test('人數上限 and 時間 remain the trailing text input fields', async () => {
