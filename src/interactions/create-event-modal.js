@@ -14,9 +14,15 @@ async function handleCreateEventModal(interaction, db) {
   const rawCapacity = interaction.fields.getTextInputValue('capacity');
   const startTime = interaction.fields.getTextInputValue('start_time');
 
+  // Deleting the title-picker message this modal was launched from requires
+  // claiming it via deferUpdate() first, then deleteReply(); after that,
+  // every further response must go through followUp() instead of reply().
+  await interaction.deferUpdate();
+  await interaction.deleteReply();
+
   const capacity = parseCapacity(rawCapacity);
   if (capacity === null) {
-    await interaction.reply({ content: '人數上限必須是正整數，請重新使用 /揪團 建立', ephemeral: true });
+    await interaction.followUp({ content: '人數上限必須是正整數，請重新使用 /揪團 建立', ephemeral: true });
     return;
   }
 
@@ -33,8 +39,7 @@ async function handleCreateEventModal(interaction, db) {
   const embed = buildEventEmbed(event, []);
   const row = buildActionRow(event, 0);
 
-  await interaction.reply({ embeds: [embed], components: [row] });
-  const message = await interaction.fetchReply();
+  const message = await interaction.followUp({ embeds: [embed], components: [row] });
   updateEventMessageId(db, event.id, message.id);
 
   const thread = await message.startThread({ name: title.slice(0, 100) });
