@@ -8,6 +8,7 @@ function buildCreateEventModal(title) {
   const startTimeInput = new TextInputBuilder()
     .setCustomId('start_time')
     .setLabel('時間')
+    .setPlaceholder('月/日 時:分，例如 7/12 20:00')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 

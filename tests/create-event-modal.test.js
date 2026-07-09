@@ -1,5 +1,5 @@
 const { initDb, getEventById } = require('../src/db/db');
-const { handleCreateEventModal } = require('../src/interactions/create-event-modal');
+const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
 function makeInteraction({ title, startTime }) {
   return {
@@ -16,6 +16,25 @@ function makeInteraction({ title, startTime }) {
     })),
   };
 }
+
+describe('isValidStartTime', () => {
+  test('accepts valid M/D HH:mm strings', () => {
+    expect(isValidStartTime('7/12 20:00')).toBe(true);
+    expect(isValidStartTime('12/31 23:59')).toBe(true);
+    expect(isValidStartTime('1/1 00:00')).toBe(true);
+  });
+
+  test('rejects malformed or out-of-range strings', () => {
+    expect(isValidStartTime('7/12')).toBe(false);
+    expect(isValidStartTime('7-12 20:00')).toBe(false);
+    expect(isValidStartTime('晚上八點')).toBe(false);
+    expect(isValidStartTime('13/1 20:00')).toBe(false);
+    expect(isValidStartTime('7/32 20:00')).toBe(false);
+    expect(isValidStartTime('7/12 24:00')).toBe(false);
+    expect(isValidStartTime('7/12 20:60')).toBe(false);
+    expect(isValidStartTime('7/12 20:5')).toBe(false);
+  });
+});
 
 describe('handleCreateEventModal', () => {
   test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed', async () => {
@@ -43,5 +62,17 @@ describe('handleCreateEventModal', () => {
 
     const event = getEventById(db, 1);
     expect(event.capacity).toBe(12);
+  });
+
+  test('replies with a follow-up error and does not create an event when the time format is invalid', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉', startTime: '晚上八點' });
+
+    await handleCreateEventModal(interaction, db);
+
+    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(getEventById(db, 1)).toBeUndefined();
   });
 });
