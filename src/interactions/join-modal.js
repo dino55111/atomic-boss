@@ -10,7 +10,19 @@ async function handleJoinModal(interaction, db) {
     return;
   }
 
-  const [className] = interaction.fields.getStringSelectValues('class');
+  const classChoice1 = interaction.fields.getRadioGroup('class_1');
+  const classChoice2 = interaction.fields.getRadioGroup('class_2');
+
+  if (classChoice1 && classChoice2) {
+    await interaction.reply({ content: '職業請只選一邊', ephemeral: true });
+    return;
+  }
+  const className = classChoice1 ?? classChoice2;
+  if (!className) {
+    await interaction.reply({ content: '請選擇職業', ephemeral: true });
+    return;
+  }
+
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
 

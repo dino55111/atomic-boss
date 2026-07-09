@@ -1,3 +1,4 @@
+const { ComponentType } = require('discord-api-types/v10');
 const { initDb, createEvent, addSignup } = require('../src/db/db');
 const { buildJoinModal, handleSignupButton, handleCancelButton, CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
@@ -15,23 +16,40 @@ function makeEvent(db, overrides = {}) {
 }
 
 describe('buildJoinModal', () => {
-  test('customId embeds the event id and has 3 fields', () => {
+  test('customId embeds the event id and has 4 fields (class split into two groups)', () => {
     const modal = buildJoinModal(42);
     expect(modal.data.custom_id).toBe('join-modal:42');
-    expect(modal.components).toHaveLength(3);
+    expect(modal.components).toHaveLength(4);
   });
 
-  test('職業 field is a required single-select offering all class options', () => {
+  test('職業（1/2）is an optional radio group offering the first 6 class options', () => {
     const modal = buildJoinModal(42);
     const classLabel = modal.components[0];
-    expect(classLabel.data.label).toBe('職業');
+    expect(classLabel.data.label).toBe('職業（1/2）');
 
-    const classSelect = classLabel.data.component;
-    expect(classSelect.data.custom_id).toBe('class');
-    expect(classSelect.data.required).toBe(true);
-    expect(classSelect.data.min_values).toBe(1);
-    expect(classSelect.data.max_values).toBe(1);
-    expect(classSelect.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS);
+    const classRadioGroup = classLabel.data.component;
+    expect(classRadioGroup.data.type).toBe(ComponentType.RadioGroup);
+    expect(classRadioGroup.data.custom_id).toBe('class_1');
+    expect(classRadioGroup.data.required).toBeFalsy();
+    expect(classRadioGroup.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS.slice(0, 6));
+  });
+
+  test('職業（2/2）is an optional radio group offering the last 6 class options', () => {
+    const modal = buildJoinModal(42);
+    const classLabel = modal.components[1];
+    expect(classLabel.data.label).toBe('職業（2/2）');
+
+    const classRadioGroup = classLabel.data.component;
+    expect(classRadioGroup.data.type).toBe(ComponentType.RadioGroup);
+    expect(classRadioGroup.data.custom_id).toBe('class_2');
+    expect(classRadioGroup.data.required).toBeFalsy();
+    expect(classRadioGroup.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS.slice(6));
+  });
+
+  test('等級 and 遊戲 ID remain the trailing text input fields', () => {
+    const modal = buildJoinModal(42);
+    expect(modal.components[2].data.label).toBe('等級');
+    expect(modal.components[3].data.label).toBe('遊戲 ID');
   });
 });
 

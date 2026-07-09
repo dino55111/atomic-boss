@@ -3,7 +3,7 @@ const {
   LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
-  StringSelectMenuBuilder,
+  RadioGroupBuilder,
 } = require('discord.js');
 const { getEventById, removeSignup, getSignups, REMOVE_SIGNUP_OK } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
@@ -18,17 +18,27 @@ function buildJoinModal(eventId) {
     .setCustomId(`join-modal:${eventId}`)
     .setTitle('報名揪團');
 
-  const classSelect = new StringSelectMenuBuilder()
-    .setCustomId('class')
-    .setPlaceholder('請選擇職業')
-    .setMinValues(1)
-    .setMaxValues(1)
-    .setRequired(true)
-    .addOptions(CLASS_OPTIONS.map((className) => ({ label: className, value: className })));
+  // Discord's RadioGroup component caps out at 10 options, so the 12 classes
+  // are split across two optional groups; handleJoinModal enforces that
+  // exactly one of the two ends up selected.
+  const classOptions1 = CLASS_OPTIONS.slice(0, 6);
+  const classOptions2 = CLASS_OPTIONS.slice(6);
 
-  const classLabel = new LabelBuilder()
-    .setLabel('職業')
-    .setStringSelectMenuComponent(classSelect);
+  const classRadioGroup1 = new RadioGroupBuilder()
+    .setCustomId('class_1')
+    .addOptions(classOptions1.map((className) => ({ label: className, value: className })));
+
+  const classLabel1 = new LabelBuilder()
+    .setLabel('職業（1/2）')
+    .setRadioGroupComponent(classRadioGroup1);
+
+  const classRadioGroup2 = new RadioGroupBuilder()
+    .setCustomId('class_2')
+    .addOptions(classOptions2.map((className) => ({ label: className, value: className })));
+
+  const classLabel2 = new LabelBuilder()
+    .setLabel('職業（2/2）')
+    .setRadioGroupComponent(classRadioGroup2);
 
   const levelInput = new TextInputBuilder()
     .setCustomId('level')
@@ -48,7 +58,7 @@ function buildJoinModal(eventId) {
     .setLabel('遊戲 ID')
     .setTextInputComponent(gameIdInput);
 
-  modal.addLabelComponents(classLabel, levelLabel, gameIdLabel);
+  modal.addLabelComponents(classLabel1, classLabel2, levelLabel, gameIdLabel);
 
   return modal;
 }
