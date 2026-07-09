@@ -1,10 +1,13 @@
 const {
   SlashCommandBuilder,
   ModalBuilder,
+  LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
-  ActionRowBuilder,
+  RadioGroupBuilder,
 } = require('discord.js');
+
+const TITLE_OPTIONS = ['普拉', '普炎', '困拉', '龍王', '蝴蝶王'];
 
 const data = new SlashCommandBuilder()
   .setName('揪團')
@@ -15,31 +18,36 @@ async function execute(interaction) {
     .setCustomId('create-event-modal')
     .setTitle('建立揪團');
 
-  const titleInput = new TextInputBuilder()
+  const titleRadioGroup = new RadioGroupBuilder()
     .setCustomId('title')
+    .setRequired(true)
+    .addOptions(TITLE_OPTIONS.map((title) => ({ label: title, value: title })));
+
+  const titleLabel = new LabelBuilder()
     .setLabel('標題')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+    .setRadioGroupComponent(titleRadioGroup);
 
   const capacityInput = new TextInputBuilder()
     .setCustomId('capacity')
-    .setLabel('人數上限')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
+
+  const capacityLabel = new LabelBuilder()
+    .setLabel('人數上限')
+    .setTextInputComponent(capacityInput);
 
   const startTimeInput = new TextInputBuilder()
     .setCustomId('start_time')
-    .setLabel('時間')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(titleInput),
-    new ActionRowBuilder().addComponents(capacityInput),
-    new ActionRowBuilder().addComponents(startTimeInput),
-  );
+  const startTimeLabel = new LabelBuilder()
+    .setLabel('時間')
+    .setTextInputComponent(startTimeInput);
+
+  modal.addLabelComponents(titleLabel, capacityLabel, startTimeLabel);
 
   await interaction.showModal(modal);
 }
 
-module.exports = { data, execute };
+module.exports = { data, execute, TITLE_OPTIONS };

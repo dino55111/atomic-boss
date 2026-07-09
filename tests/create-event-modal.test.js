@@ -6,7 +6,10 @@ function makeInteraction(fieldValues) {
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
-    fields: { getTextInputValue: (id) => fieldValues[id] },
+    fields: {
+      getTextInputValue: (id) => fieldValues[id],
+      getRadioGroup: (id) => fieldValues[id],
+    },
     reply: jest.fn(async () => {}),
     fetchReply: jest.fn(async () => ({
       id: 'message-1',
@@ -30,7 +33,7 @@ describe('parseCapacity', () => {
 describe('handleCreateEventModal', () => {
   test('creates an event, posts the embed, and stores the resulting message id', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '週三夜間團', capacity: '3', start_time: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', capacity: '3', start_time: '7/12 20:00' });
 
     await handleCreateEventModal(interaction, db);
 
@@ -40,7 +43,7 @@ describe('handleCreateEventModal', () => {
     expect(replyPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '週三夜間團', capacity: 3, message_id: 'message-1', thread_id: 'thread-1' });
+    expect(event).toMatchObject({ title: '普拉', capacity: 3, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
   test('replies with an error and does not create an event when capacity is invalid', async () => {

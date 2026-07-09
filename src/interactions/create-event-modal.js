@@ -10,7 +10,7 @@ function parseCapacity(rawCapacity) {
 }
 
 async function handleCreateEventModal(interaction, db) {
-  const title = interaction.fields.getTextInputValue('title');
+  const title = interaction.fields.getRadioGroup('title');
   const rawCapacity = interaction.fields.getTextInputValue('capacity');
   const startTime = interaction.fields.getTextInputValue('start_time');
 
