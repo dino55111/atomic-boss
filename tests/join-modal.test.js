@@ -21,14 +21,16 @@ function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessa
     customId: `join-modal:${eventId}:${className}`,
     user: { id: userId, username: userId },
     fields: { getTextInputValue: (id) => fieldValues[id] },
-    reply: jest.fn(async () => {}),
+    deferUpdate: jest.fn(async () => {}),
+    deleteReply: jest.fn(async () => {}),
+    followUp: jest.fn(async () => {}),
     channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
     client: { channels: { fetch: jest.fn(async () => thread) } },
   };
 }
 
 describe('handleJoinModal', () => {
-  test('adds the signup with the class embedded in the customId, edits the message, and posts to the thread', async () => {
+  test('deletes the class-picker message, adds the signup, edits the message, and posts to the thread', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -44,17 +46,19 @@ describe('handleJoinModal', () => {
 
     await handleJoinModal(interaction, db);
 
+    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(editedMessage.edit).toHaveBeenCalledTimes(1);
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
     expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
 
     const [signup] = getSignups(db, event.id);
     expect(signup.class).toBe('冰雷');
   });
 
-  test('replies with an ephemeral message when the user already signed up', async () => {
+  test('deletes the class-picker message and replies with a follow-up when the user already signed up', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -66,10 +70,11 @@ describe('handleJoinModal', () => {
 
     await handleJoinModal(interaction2, db);
 
-    expect(interaction2.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '你已經報名囉', ephemeral: true }));
+    expect(interaction2.deleteReply).toHaveBeenCalledTimes(1);
+    expect(interaction2.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '你已經報名囉', ephemeral: true }));
   });
 
-  test('replies with an ephemeral message when the event is full', async () => {
+  test('deletes the class-picker message and replies with a follow-up when the event is full', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 1 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -80,15 +85,17 @@ describe('handleJoinModal', () => {
 
     await handleJoinModal(interaction2, db);
 
-    expect(interaction2.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
+    expect(interaction2.deleteReply).toHaveBeenCalledTimes(1);
+    expect(interaction2.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
   });
 
-  test('replies with an error when the event no longer exists', async () => {
+  test('deletes the class-picker message and replies with a follow-up when the event no longer exists', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ eventId: 999, className: '冰雷', userId: 'user-1', fieldValues: { level: 'y', game_id: 'z' }, fetchedMessage: {} });
 
     await handleJoinModal(interaction, db);
 
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
   });
 });
