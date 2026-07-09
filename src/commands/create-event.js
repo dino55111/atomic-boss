@@ -1,6 +1,14 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-const TITLE_OPTIONS = ['普拉', '普炎', '困拉', '龍王', '蝴蝶王'];
+const TITLE_CAPACITIES = {
+  普拉: 6,
+  普炎: 6,
+  困拉: 6,
+  龍王: 12,
+  蝴蝶王: 6,
+};
+
+const TITLE_OPTIONS = Object.keys(TITLE_CAPACITIES);
 
 const data = new SlashCommandBuilder()
   .setName('揪團')
@@ -25,4 +33,4 @@ async function execute(interaction) {
   });
 }
 
-module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS };
+module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES };

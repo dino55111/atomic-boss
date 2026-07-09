@@ -1,11 +1,13 @@
 const { buildCreateEventModal, handleTitleChoiceButton } = require('../src/interactions/title-choice-button');
 
 describe('buildCreateEventModal', () => {
-  test('customId embeds the chosen title, title mentions it, and has 2 plain text-input fields', () => {
+  test('customId embeds the chosen title, title mentions it, and has only the 時間 field', () => {
     const modal = buildCreateEventModal('普拉');
     expect(modal.data.custom_id).toBe('create-event-modal:普拉');
     expect(modal.data.title).toBe('建立揪團（普拉）');
-    expect(modal.components).toHaveLength(2);
+    expect(modal.components).toHaveLength(1);
+    expect(modal.components[0].components[0].data.label).toBe('時間');
+    expect(modal.components[0].components[0].data.custom_id).toBe('start_time');
   });
 });
 

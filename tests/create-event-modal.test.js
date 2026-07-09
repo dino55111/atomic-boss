@@ -1,13 +1,13 @@
 const { initDb, getEventById } = require('../src/db/db');
-const { handleCreateEventModal, parseCapacity } = require('../src/interactions/create-event-modal');
+const { handleCreateEventModal } = require('../src/interactions/create-event-modal');
 
-function makeInteraction({ title, fieldValues }) {
+function makeInteraction({ title, startTime }) {
   return {
     customId: `create-event-modal:${title}`,
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
-    fields: { getTextInputValue: (id) => fieldValues[id] },
+    fields: { getTextInputValue: () => startTime },
     deferUpdate: jest.fn(async () => {}),
     deleteReply: jest.fn(async () => {}),
     followUp: jest.fn(async () => ({
@@ -17,22 +17,10 @@ function makeInteraction({ title, fieldValues }) {
   };
 }
 
-describe('parseCapacity', () => {
-  test('parses a valid positive integer string', () => {
-    expect(parseCapacity('5')).toBe(5);
-  });
-
-  test('rejects zero, negative, and non-numeric input', () => {
-    expect(parseCapacity('0')).toBeNull();
-    expect(parseCapacity('-1')).toBeNull();
-    expect(parseCapacity('abc')).toBeNull();
-  });
-});
-
 describe('handleCreateEventModal', () => {
-  test('deletes the title-picker message, creates the event, posts the embed, and stores the resulting message id', async () => {
+  test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', fieldValues: { capacity: '3', start_time: '7/12 20:00' } });
+    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00' });
 
     await handleCreateEventModal(interaction, db);
 
@@ -44,17 +32,16 @@ describe('handleCreateEventModal', () => {
     expect(followUpPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '普拉', capacity: 3, message_id: 'message-1', thread_id: 'thread-1' });
+    expect(event).toMatchObject({ title: '普拉', capacity: 6, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
-  test('deletes the title-picker message and replies with a follow-up error when capacity is invalid', async () => {
+  test('龍王 gets a capacity of 12', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', fieldValues: { capacity: 'not-a-number', start_time: '7/12 20:00' } });
+    const interaction = makeInteraction({ title: '龍王', startTime: '7/12 20:00' });
 
     await handleCreateEventModal(interaction, db);
 
-    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
-    expect(getEventById(db, 1)).toBeUndefined();
+    const event = getEventById(db, 1);
+    expect(event.capacity).toBe(12);
   });
 });

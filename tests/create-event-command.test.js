@@ -1,4 +1,4 @@
-const { data, execute, buildTitleButtonRow, TITLE_OPTIONS } = require('../src/commands/create-event');
+const { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES } = require('../src/commands/create-event');
 
 describe('create-event command', () => {
   test('command name is 揪團', () => {
@@ -24,5 +24,19 @@ describe('buildTitleButtonRow', () => {
     const customIds = row.components.map((button) => button.data.custom_id);
     expect(labels).toEqual(TITLE_OPTIONS);
     expect(customIds).toEqual(TITLE_OPTIONS.map((title) => `title-choice:${title}`));
+  });
+});
+
+describe('TITLE_CAPACITIES', () => {
+  test('龍王 has a capacity of 12 and every other title has a capacity of 6', () => {
+    expect(TITLE_CAPACITIES['龍王']).toBe(12);
+    for (const title of TITLE_OPTIONS) {
+      if (title === '龍王') continue;
+      expect(TITLE_CAPACITIES[title]).toBe(6);
+    }
+  });
+
+  test('has an entry for every title option', () => {
+    expect(Object.keys(TITLE_CAPACITIES).sort()).toEqual([...TITLE_OPTIONS].sort());
   });
 });
