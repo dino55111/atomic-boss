@@ -2,24 +2,12 @@ const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICA
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 
 async function handleJoinModal(interaction, db) {
-  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const [, eventIdRaw, className] = interaction.customId.split(':');
+  const eventId = Number.parseInt(eventIdRaw, 10);
   const event = getEventById(db, eventId);
 
   if (!event) {
     await interaction.reply({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true });
-    return;
-  }
-
-  const classChoice1 = interaction.fields.getRadioGroup('class_1');
-  const classChoice2 = interaction.fields.getRadioGroup('class_2');
-
-  if (classChoice1 && classChoice2) {
-    await interaction.reply({ content: '職業請只選一邊', ephemeral: true });
-    return;
-  }
-  const className = classChoice1 ?? classChoice2;
-  if (!className) {
-    await interaction.reply({ content: '請選擇職業', ephemeral: true });
     return;
   }
 

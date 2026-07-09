@@ -1,4 +1,4 @@
-const { initDb, createEvent } = require('../src/db/db');
+const { initDb, createEvent, getSignups } = require('../src/db/db');
 const { handleJoinModal } = require('../src/interactions/join-modal');
 
 function makeEvent(db, overrides = {}) {
@@ -14,76 +14,24 @@ function makeEvent(db, overrides = {}) {
   });
 }
 
-function makeInteraction({ eventId, userId, fieldValues, fetchedMessage }) {
+function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage }) {
   return {
-    customId: `join-modal:${eventId}`,
+    customId: `join-modal:${eventId}:${className}`,
     user: { id: userId, username: userId },
-    fields: {
-      getTextInputValue: (id) => fieldValues[id],
-      getRadioGroup: (id) => fieldValues[id],
-    },
+    fields: { getTextInputValue: (id) => fieldValues[id] },
     reply: jest.fn(async () => {}),
     channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
   };
 }
 
 describe('handleJoinModal', () => {
-  test('adds the signup and edits the original message', async () => {
+  test('adds the signup with the class embedded in the customId and edits the original message', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
     const interaction = makeInteraction({
       eventId: event.id,
-      userId: 'user-1',
-      fieldValues: { class_1: '戰士', level: '70', game_id: 'alice#1' },
-      fetchedMessage: editedMessage,
-    });
-
-    await handleJoinModal(interaction, db);
-
-    expect(editedMessage.edit).toHaveBeenCalledTimes(1);
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
-  });
-
-  test('accepts a class chosen from the second radio group', async () => {
-    const db = initDb(':memory:');
-    const event = makeEvent(db, { capacity: 2 });
-    const editedMessage = { edit: jest.fn(async () => {}) };
-    const interaction = makeInteraction({
-      eventId: event.id,
-      userId: 'user-1',
-      fieldValues: { class_2: '英雄', level: '70', game_id: 'alice#1' },
-      fetchedMessage: editedMessage,
-    });
-
-    await handleJoinModal(interaction, db);
-
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
-  });
-
-  test('replies with an ephemeral message when both class radio groups are selected', async () => {
-    const db = initDb(':memory:');
-    const event = makeEvent(db, { capacity: 2 });
-    const editedMessage = { edit: jest.fn(async () => {}) };
-    const interaction = makeInteraction({
-      eventId: event.id,
-      userId: 'user-1',
-      fieldValues: { class_1: '戰士', class_2: '英雄', level: '70', game_id: 'alice#1' },
-      fetchedMessage: editedMessage,
-    });
-
-    await handleJoinModal(interaction, db);
-
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '職業請只選一邊', ephemeral: true }));
-    expect(editedMessage.edit).not.toHaveBeenCalled();
-  });
-
-  test('replies with an ephemeral message when no class is selected', async () => {
-    const db = initDb(':memory:');
-    const event = makeEvent(db, { capacity: 2 });
-    const editedMessage = { edit: jest.fn(async () => {}) };
-    const interaction = makeInteraction({
-      eventId: event.id,
+      className: '冰雷',
       userId: 'user-1',
       fieldValues: { level: '70', game_id: 'alice#1' },
       fetchedMessage: editedMessage,
@@ -91,18 +39,21 @@ describe('handleJoinModal', () => {
 
     await handleJoinModal(interaction, db);
 
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '請選擇職業', ephemeral: true }));
-    expect(editedMessage.edit).not.toHaveBeenCalled();
+    expect(editedMessage.edit).toHaveBeenCalledTimes(1);
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.class).toBe('冰雷');
   });
 
   test('replies with an ephemeral message when the user already signed up', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const fieldValues = { class_1: '戰士', level: '70', game_id: 'alice#1' };
+    const fieldValues = { level: '70', game_id: 'alice#1' };
 
-    await handleJoinModal(makeInteraction({ eventId: event.id, userId: 'user-1', fieldValues, fetchedMessage: editedMessage }), db);
-    const interaction2 = makeInteraction({ eventId: event.id, userId: 'user-1', fieldValues, fetchedMessage: editedMessage });
+    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues, fetchedMessage: editedMessage }), db);
+    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-1', fieldValues, fetchedMessage: editedMessage });
 
     await handleJoinModal(interaction2, db);
 
@@ -114,8 +65,8 @@ describe('handleJoinModal', () => {
     const event = makeEvent(db, { capacity: 1 });
     const editedMessage = { edit: jest.fn(async () => {}) };
 
-    await handleJoinModal(makeInteraction({ eventId: event.id, userId: 'user-1', fieldValues: { class_1: '戰士', level: '70', game_id: 'a' }, fetchedMessage: editedMessage }), db);
-    const interaction2 = makeInteraction({ eventId: event.id, userId: 'user-2', fieldValues: { class_1: '法師', level: '65', game_id: 'b' }, fetchedMessage: editedMessage });
+    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues: { level: '70', game_id: 'a' }, fetchedMessage: editedMessage }), db);
+    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-2', fieldValues: { level: '65', game_id: 'b' }, fetchedMessage: editedMessage });
 
     await handleJoinModal(interaction2, db);
 
@@ -124,7 +75,7 @@ describe('handleJoinModal', () => {
 
   test('replies with an error when the event no longer exists', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ eventId: 999, userId: 'user-1', fieldValues: { class_1: 'x', level: 'y', game_id: 'z' }, fetchedMessage: {} });
+    const interaction = makeInteraction({ eventId: 999, className: '冰雷', userId: 'user-1', fieldValues: { level: 'y', game_id: 'z' }, fetchedMessage: {} });
 
     await handleJoinModal(interaction, db);
 

@@ -1,6 +1,12 @@
-const { ComponentType } = require('discord-api-types/v10');
 const { initDb, createEvent, addSignup } = require('../src/db/db');
-const { buildJoinModal, handleSignupButton, handleCancelButton, CLASS_OPTIONS } = require('../src/interactions/signup-button');
+const {
+  buildClassButtonRows,
+  buildJoinDetailsModal,
+  handleSignupButton,
+  handleClassChoiceButton,
+  handleCancelButton,
+  CLASS_OPTIONS,
+} = require('../src/interactions/signup-button');
 
 function makeEvent(db, overrides = {}) {
   return createEvent(db, {
@@ -15,50 +21,55 @@ function makeEvent(db, overrides = {}) {
   });
 }
 
-describe('buildJoinModal', () => {
-  test('customId embeds the event id and has 4 fields (class split into two groups)', () => {
-    const modal = buildJoinModal(42);
-    expect(modal.data.custom_id).toBe('join-modal:42');
-    expect(modal.components).toHaveLength(4);
+describe('buildClassButtonRows', () => {
+  test('lays out all 12 class options across 3 rows of 4 buttons', () => {
+    const rows = buildClassButtonRows(42);
+    expect(rows).toHaveLength(3);
+    expect(rows.every((row) => row.components.length === 4)).toBe(true);
+
+    const labels = rows.flatMap((row) => row.components.map((button) => button.data.label));
+    expect(labels).toEqual(CLASS_OPTIONS);
   });
 
-  test('職業（1/2）is an optional radio group offering the first 6 class options', () => {
-    const modal = buildJoinModal(42);
-    const classLabel = modal.components[0];
-    expect(classLabel.data.label).toBe('職業（1/2）');
-
-    const classRadioGroup = classLabel.data.component;
-    expect(classRadioGroup.data.type).toBe(ComponentType.RadioGroup);
-    expect(classRadioGroup.data.custom_id).toBe('class_1');
-    expect(classRadioGroup.data.required).toBeFalsy();
-    expect(classRadioGroup.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS.slice(0, 6));
+  test('each button customId embeds the event id and its own class', () => {
+    const rows = buildClassButtonRows(42);
+    const firstButton = rows[0].components[0];
+    expect(firstButton.data.custom_id).toBe(`class-choice:42:${CLASS_OPTIONS[0]}`);
   });
+});
 
-  test('職業（2/2）is an optional radio group offering the last 6 class options', () => {
-    const modal = buildJoinModal(42);
-    const classLabel = modal.components[1];
-    expect(classLabel.data.label).toBe('職業（2/2）');
-
-    const classRadioGroup = classLabel.data.component;
-    expect(classRadioGroup.data.type).toBe(ComponentType.RadioGroup);
-    expect(classRadioGroup.data.custom_id).toBe('class_2');
-    expect(classRadioGroup.data.required).toBeFalsy();
-    expect(classRadioGroup.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS.slice(6));
-  });
-
-  test('等級 and 遊戲 ID remain the trailing text input fields', () => {
-    const modal = buildJoinModal(42);
-    expect(modal.components[2].data.label).toBe('等級');
-    expect(modal.components[3].data.label).toBe('遊戲 ID');
+describe('buildJoinDetailsModal', () => {
+  test('customId embeds the event id and chosen class, title mentions the class, and has 2 fields', () => {
+    const modal = buildJoinDetailsModal(42, '冰雷');
+    expect(modal.data.custom_id).toBe('join-modal:42:冰雷');
+    expect(modal.data.title).toBe('報名揪團（冰雷）');
+    expect(modal.components).toHaveLength(2);
+    expect(modal.components[0].data.label).toBe('等級');
+    expect(modal.components[1].data.label).toBe('遊戲 ID');
   });
 });
 
 describe('handleSignupButton', () => {
-  test('shows the join modal for the clicked event', async () => {
-    const interaction = { customId: 'signup:42', showModal: jest.fn() };
+  test('replies with an ephemeral class-picker message for the clicked event', async () => {
+    const interaction = { customId: 'signup:42', reply: jest.fn(async () => {}) };
     await handleSignupButton(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledTimes(1);
+    const replyPayload = interaction.reply.mock.calls[0][0];
+    expect(replyPayload.ephemeral).toBe(true);
+    expect(replyPayload.components).toHaveLength(3);
+    expect(replyPayload.components[0].components[0].data.custom_id).toBe(`class-choice:42:${CLASS_OPTIONS[0]}`);
+  });
+});
+
+describe('handleClassChoiceButton', () => {
+  test('shows the join-details modal for the chosen event and class', async () => {
+    const interaction = { customId: 'class-choice:42:冰雷', showModal: jest.fn() };
+    await handleClassChoiceButton(interaction);
+
     expect(interaction.showModal).toHaveBeenCalledTimes(1);
-    expect(interaction.showModal.mock.calls[0][0].data.custom_id).toBe('join-modal:42');
+    const modal = interaction.showModal.mock.calls[0][0];
+    expect(modal.data.custom_id).toBe('join-modal:42:冰雷');
   });
 });
 

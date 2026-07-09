@@ -3,7 +3,9 @@ const {
   LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
-  RadioGroupBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
 } = require('discord.js');
 const { getEventById, removeSignup, getSignups, REMOVE_SIGNUP_OK } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
@@ -13,32 +15,27 @@ const CLASS_OPTIONS = [
   '夜使者', '黑騎士', '聖騎士', '英雄', '槍神', '拳霸',
 ];
 
-function buildJoinModal(eventId) {
+const CLASS_BUTTONS_PER_ROW = 4;
+
+function buildClassButtonRows(eventId) {
+  const buttons = CLASS_OPTIONS.map((className) =>
+    new ButtonBuilder()
+      .setCustomId(`class-choice:${eventId}:${className}`)
+      .setLabel(className)
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += CLASS_BUTTONS_PER_ROW) {
+    rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + CLASS_BUTTONS_PER_ROW)));
+  }
+  return rows;
+}
+
+function buildJoinDetailsModal(eventId, className) {
   const modal = new ModalBuilder()
-    .setCustomId(`join-modal:${eventId}`)
-    .setTitle('報名揪團');
-
-  // Discord's RadioGroup component caps out at 10 options, so the 12 classes
-  // are split across two optional groups; handleJoinModal enforces that
-  // exactly one of the two ends up selected.
-  const classOptions1 = CLASS_OPTIONS.slice(0, 6);
-  const classOptions2 = CLASS_OPTIONS.slice(6);
-
-  const classRadioGroup1 = new RadioGroupBuilder()
-    .setCustomId('class_1')
-    .addOptions(classOptions1.map((className) => ({ label: className, value: className })));
-
-  const classLabel1 = new LabelBuilder()
-    .setLabel('職業（1/2）')
-    .setRadioGroupComponent(classRadioGroup1);
-
-  const classRadioGroup2 = new RadioGroupBuilder()
-    .setCustomId('class_2')
-    .addOptions(classOptions2.map((className) => ({ label: className, value: className })));
-
-  const classLabel2 = new LabelBuilder()
-    .setLabel('職業（2/2）')
-    .setRadioGroupComponent(classRadioGroup2);
+    .setCustomId(`join-modal:${eventId}:${className}`)
+    .setTitle(`報名揪團（${className}）`);
 
   const levelInput = new TextInputBuilder()
     .setCustomId('level')
@@ -58,14 +55,23 @@ function buildJoinModal(eventId) {
     .setLabel('遊戲 ID')
     .setTextInputComponent(gameIdInput);
 
-  modal.addLabelComponents(classLabel1, classLabel2, levelLabel, gameIdLabel);
+  modal.addLabelComponents(levelLabel, gameIdLabel);
 
   return modal;
 }
 
 async function handleSignupButton(interaction) {
   const eventId = interaction.customId.split(':')[1];
-  await interaction.showModal(buildJoinModal(eventId));
+  await interaction.reply({
+    content: '請選擇職業：',
+    components: buildClassButtonRows(eventId),
+    ephemeral: true,
+  });
+}
+
+async function handleClassChoiceButton(interaction) {
+  const [, eventId, className] = interaction.customId.split(':');
+  await interaction.showModal(buildJoinDetailsModal(eventId, className));
 }
 
 async function handleCancelButton(interaction, db) {
@@ -92,4 +98,11 @@ async function handleCancelButton(interaction, db) {
   await interaction.reply({ content: '已取消報名', ephemeral: true });
 }
 
-module.exports = { buildJoinModal, handleSignupButton, handleCancelButton, CLASS_OPTIONS };
+module.exports = {
+  buildClassButtonRows,
+  buildJoinDetailsModal,
+  handleSignupButton,
+  handleClassChoiceButton,
+  handleCancelButton,
+  CLASS_OPTIONS,
+};
