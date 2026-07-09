@@ -18,7 +18,10 @@ function makeInteraction({ eventId, userId, fieldValues, fetchedMessage }) {
   return {
     customId: `join-modal:${eventId}`,
     user: { id: userId, username: userId },
-    fields: { getTextInputValue: (id) => fieldValues[id] },
+    fields: {
+      getTextInputValue: (id) => fieldValues[id],
+      getStringSelectValues: (id) => [fieldValues[id]],
+    },
     reply: jest.fn(async () => {}),
     channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
   };

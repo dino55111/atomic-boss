@@ -1,35 +1,54 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const {
+  ModalBuilder,
+  LabelBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  StringSelectMenuBuilder,
+} = require('discord.js');
 const { getEventById, removeSignup, getSignups, REMOVE_SIGNUP_OK } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
+
+const CLASS_OPTIONS = [
+  '冰雷', '火毒', '主教', '箭神', '神射手', '暗影神偷',
+  '夜使者', '黑騎士', '聖騎士', '英雄', '槍神', '拳霸',
+];
 
 function buildJoinModal(eventId) {
   const modal = new ModalBuilder()
     .setCustomId(`join-modal:${eventId}`)
     .setTitle('報名揪團');
 
-  const classInput = new TextInputBuilder()
+  const classSelect = new StringSelectMenuBuilder()
     .setCustomId('class')
+    .setPlaceholder('請選擇職業')
+    .setMinValues(1)
+    .setMaxValues(1)
+    .setRequired(true)
+    .addOptions(CLASS_OPTIONS.map((className) => ({ label: className, value: className })));
+
+  const classLabel = new LabelBuilder()
     .setLabel('職業')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
+    .setStringSelectMenuComponent(classSelect);
 
   const levelInput = new TextInputBuilder()
     .setCustomId('level')
-    .setLabel('等級')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
+
+  const levelLabel = new LabelBuilder()
+    .setLabel('等級')
+    .setTextInputComponent(levelInput);
 
   const gameIdInput = new TextInputBuilder()
     .setCustomId('game_id')
-    .setLabel('遊戲 ID')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(classInput),
-    new ActionRowBuilder().addComponents(levelInput),
-    new ActionRowBuilder().addComponents(gameIdInput),
-  );
+  const gameIdLabel = new LabelBuilder()
+    .setLabel('遊戲 ID')
+    .setTextInputComponent(gameIdInput);
+
+  modal.addLabelComponents(classLabel, levelLabel, gameIdLabel);
 
   return modal;
 }
@@ -63,4 +82,4 @@ async function handleCancelButton(interaction, db) {
   await interaction.reply({ content: '已取消報名', ephemeral: true });
 }
 
-module.exports = { buildJoinModal, handleSignupButton, handleCancelButton };
+module.exports = { buildJoinModal, handleSignupButton, handleCancelButton, CLASS_OPTIONS };

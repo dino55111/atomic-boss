@@ -1,5 +1,5 @@
 const { initDb, createEvent, addSignup } = require('../src/db/db');
-const { buildJoinModal, handleSignupButton, handleCancelButton } = require('../src/interactions/signup-button');
+const { buildJoinModal, handleSignupButton, handleCancelButton, CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
 function makeEvent(db, overrides = {}) {
   return createEvent(db, {
@@ -15,10 +15,23 @@ function makeEvent(db, overrides = {}) {
 }
 
 describe('buildJoinModal', () => {
-  test('customId embeds the event id and has 3 inputs', () => {
+  test('customId embeds the event id and has 3 fields', () => {
     const modal = buildJoinModal(42);
     expect(modal.data.custom_id).toBe('join-modal:42');
     expect(modal.components).toHaveLength(3);
+  });
+
+  test('職業 field is a required single-select offering all class options', () => {
+    const modal = buildJoinModal(42);
+    const classLabel = modal.components[0];
+    expect(classLabel.data.label).toBe('職業');
+
+    const classSelect = classLabel.data.component;
+    expect(classSelect.data.custom_id).toBe('class');
+    expect(classSelect.data.required).toBe(true);
+    expect(classSelect.data.min_values).toBe(1);
+    expect(classSelect.data.max_values).toBe(1);
+    expect(classSelect.options.map((option) => option.data.value)).toEqual(CLASS_OPTIONS);
   });
 });
 

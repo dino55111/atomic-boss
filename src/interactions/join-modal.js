@@ -10,7 +10,7 @@ async function handleJoinModal(interaction, db) {
     return;
   }
 
-  const className = interaction.fields.getTextInputValue('class');
+  const [className] = interaction.fields.getStringSelectValues('class');
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
 
