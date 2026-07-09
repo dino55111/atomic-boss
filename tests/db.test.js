@@ -5,6 +5,7 @@ const {
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
+  updateEventThreadMessageId,
   getSignups,
   countSignups,
   hasSignedUp,
@@ -60,6 +61,14 @@ describe('db', () => {
     expect(getEventById(db, event.id).thread_id).toBeNull();
     updateEventThreadId(db, event.id, 'thread-1');
     expect(getEventById(db, event.id).thread_id).toBe('thread-1');
+  });
+
+  test('updateEventThreadMessageId updates the stored thread message id', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(getEventById(db, event.id).thread_message_id).toBeNull();
+    updateEventThreadMessageId(db, event.id, 'thread-message-1');
+    expect(getEventById(db, event.id).thread_message_id).toBe('thread-message-1');
   });
 
   test('addSignup adds a signup and countSignups reflects it', () => {

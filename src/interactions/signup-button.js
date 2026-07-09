@@ -93,11 +93,14 @@ async function handleCancelButton(interaction, db) {
   const embed = buildEventEmbed(event, signups);
   const row = buildActionRow(event, signups.length);
 
-  const message = await interaction.channel.messages.fetch(event.message_id);
-  await message.edit({ embeds: [embed], components: [row] });
+  const announcementChannel = await interaction.client.channels.fetch(event.channel_id);
+  const announcementMessage = await announcementChannel.messages.fetch(event.message_id);
+  await announcementMessage.edit({ embeds: [embed] });
 
-  const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`<@${interaction.user.id}> 已取消報名`);
+  const controlMessage = await interaction.channel.messages.fetch(event.thread_message_id);
+  await controlMessage.edit({ components: [row] });
+
+  await interaction.channel.send(`<@${interaction.user.id}> 已取消報名`);
 
   await interaction.reply({ content: '已取消報名', ephemeral: true });
 }

@@ -1,4 +1,4 @@
-const { createEvent, updateEventMessageId, updateEventThreadId } = require('../db/db');
+const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 
 function parseCapacity(rawCapacity) {
@@ -31,14 +31,17 @@ async function handleCreateEventModal(interaction, db) {
   });
 
   const embed = buildEventEmbed(event, []);
-  const row = buildActionRow(event, 0);
 
-  await interaction.reply({ embeds: [embed], components: [row] });
+  await interaction.reply({ embeds: [embed] });
   const message = await interaction.fetchReply();
   updateEventMessageId(db, event.id, message.id);
 
   const thread = await message.startThread({ name: title.slice(0, 100) });
   updateEventThreadId(db, event.id, thread.id);
+
+  const row = buildActionRow(event, 0);
+  const controlMessage = await thread.send({ content: '請在這裡報名或取消報名：', components: [row] });
+  updateEventThreadMessageId(db, event.id, controlMessage.id);
 }
 
 module.exports = { handleCreateEventModal, parseCapacity };

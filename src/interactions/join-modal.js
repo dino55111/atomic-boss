@@ -35,11 +35,14 @@ async function handleJoinModal(interaction, db) {
   const embed = buildEventEmbed(event, signups);
   const row = buildActionRow(event, signups.length);
 
-  const message = await interaction.channel.messages.fetch(event.message_id);
-  await message.edit({ embeds: [embed], components: [row] });
+  const announcementChannel = await interaction.client.channels.fetch(event.channel_id);
+  const announcementMessage = await announcementChannel.messages.fetch(event.message_id);
+  await announcementMessage.edit({ embeds: [embed] });
 
-  const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}）`);
+  const controlMessage = await interaction.channel.messages.fetch(event.thread_message_id);
+  await controlMessage.edit({ components: [row] });
+
+  await interaction.channel.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}）`);
 
   await interaction.reply({ content: '報名成功！', ephemeral: true });
 }
