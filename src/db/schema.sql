@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS events (
   guild_id      TEXT NOT NULL,
   channel_id    TEXT NOT NULL,
   message_id    TEXT NOT NULL,
+  thread_id     TEXT,
   title         TEXT NOT NULL,
   capacity      INTEGER NOT NULL,
   start_time    TEXT NOT NULL,

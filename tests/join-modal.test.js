@@ -1,8 +1,8 @@
-const { initDb, createEvent, getSignups } = require('../src/db/db');
+const { initDb, createEvent, updateEventThreadId, getSignups } = require('../src/db/db');
 const { handleJoinModal } = require('../src/interactions/join-modal');
 
 function makeEvent(db, overrides = {}) {
-  return createEvent(db, {
+  const event = createEvent(db, {
     guildId: 'guild-1',
     channelId: 'channel-1',
     messageId: 'message-1',
@@ -12,34 +12,42 @@ function makeEvent(db, overrides = {}) {
     creatorId: 'creator-1',
     ...overrides,
   });
+  updateEventThreadId(db, event.id, 'thread-1');
+  return event;
 }
 
-function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage }) {
+function makeInteraction({ eventId, className, userId, fieldValues, fetchedMessage, thread }) {
   return {
     customId: `join-modal:${eventId}:${className}`,
     user: { id: userId, username: userId },
     fields: { getTextInputValue: (id) => fieldValues[id] },
     reply: jest.fn(async () => {}),
     channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
+    client: { channels: { fetch: jest.fn(async () => thread) } },
   };
 }
 
 describe('handleJoinModal', () => {
-  test('adds the signup with the class embedded in the customId and edits the original message', async () => {
+  test('adds the signup with the class embedded in the customId, edits the message, and posts to the thread', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
     const interaction = makeInteraction({
       eventId: event.id,
       className: '冰雷',
       userId: 'user-1',
       fieldValues: { level: '70', game_id: 'alice#1' },
       fetchedMessage: editedMessage,
+      thread,
     });
 
     await handleJoinModal(interaction, db);
 
     expect(editedMessage.edit).toHaveBeenCalledTimes(1);
+    expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '報名成功！' }));
 
     const [signup] = getSignups(db, event.id);
@@ -50,10 +58,11 @@ describe('handleJoinModal', () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
     const fieldValues = { level: '70', game_id: 'alice#1' };
 
-    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues, fetchedMessage: editedMessage }), db);
-    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-1', fieldValues, fetchedMessage: editedMessage });
+    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues, fetchedMessage: editedMessage, thread }), db);
+    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-1', fieldValues, fetchedMessage: editedMessage, thread });
 
     await handleJoinModal(interaction2, db);
 
@@ -64,9 +73,10 @@ describe('handleJoinModal', () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 1 });
     const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
 
-    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues: { level: '70', game_id: 'a' }, fetchedMessage: editedMessage }), db);
-    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-2', fieldValues: { level: '65', game_id: 'b' }, fetchedMessage: editedMessage });
+    await handleJoinModal(makeInteraction({ eventId: event.id, className: '冰雷', userId: 'user-1', fieldValues: { level: '70', game_id: 'a' }, fetchedMessage: editedMessage, thread }), db);
+    const interaction2 = makeInteraction({ eventId: event.id, className: '火毒', userId: 'user-2', fieldValues: { level: '65', game_id: 'b' }, fetchedMessage: editedMessage, thread });
 
     await handleJoinModal(interaction2, db);
 

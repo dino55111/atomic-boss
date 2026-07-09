@@ -1,4 +1,4 @@
-const { createEvent, updateEventMessageId } = require('../db/db');
+const { createEvent, updateEventMessageId, updateEventThreadId } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 
 function parseCapacity(rawCapacity) {
@@ -36,6 +36,9 @@ async function handleCreateEventModal(interaction, db) {
   await interaction.reply({ embeds: [embed], components: [row] });
   const message = await interaction.fetchReply();
   updateEventMessageId(db, event.id, message.id);
+
+  const thread = await message.startThread({ name: title.slice(0, 100) });
+  updateEventThreadId(db, event.id, thread.id);
 }
 
 module.exports = { handleCreateEventModal, parseCapacity };

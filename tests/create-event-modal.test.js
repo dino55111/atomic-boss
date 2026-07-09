@@ -8,7 +8,10 @@ function makeInteraction(fieldValues) {
     user: { id: 'creator-1' },
     fields: { getTextInputValue: (id) => fieldValues[id] },
     reply: jest.fn(async () => {}),
-    fetchReply: jest.fn(async () => ({ id: 'message-1' })),
+    fetchReply: jest.fn(async () => ({
+      id: 'message-1',
+      startThread: jest.fn(async () => ({ id: 'thread-1' })),
+    })),
   };
 }
 
@@ -37,7 +40,7 @@ describe('handleCreateEventModal', () => {
     expect(replyPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '週三夜間團', capacity: 3, message_id: 'message-1' });
+    expect(event).toMatchObject({ title: '週三夜間團', capacity: 3, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
   test('replies with an error and does not create an event when capacity is invalid', async () => {
