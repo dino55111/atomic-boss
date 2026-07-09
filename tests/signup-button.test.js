@@ -107,19 +107,21 @@ describe('handleCancelButton', () => {
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
   });
 
-  test('replies with an ephemeral message when the user never signed up', async () => {
+  test('silently acknowledges without any message when the user never signed up', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db);
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
+      deferUpdate: jest.fn(async () => {}),
       channel: { messages: { fetch: jest.fn() } },
     };
 
     await handleCancelButton(interaction, db);
 
-    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '你還沒有報名喔', ephemeral: true }));
+    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.reply).not.toHaveBeenCalled();
   });
 
   test('replies with an error when the event no longer exists', async () => {

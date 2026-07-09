@@ -41,9 +41,6 @@ async function handleJoinModal(interaction, db) {
   });
 
   if (result === ADD_SIGNUP_DUPLICATE) {
-    if (acked) {
-      await interaction.followUp({ content: '你已經報名囉', ephemeral: true });
-    }
     return;
   }
   if (result === ADD_SIGNUP_FULL) {

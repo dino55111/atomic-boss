@@ -2,6 +2,7 @@ const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
 function makeInteraction({ title, startTime, deferUpdateFails = false }) {
+  const startThread = jest.fn(async () => ({ id: 'thread-1' }));
   return {
     customId: `create-event-modal:${title}`,
     guildId: 'guild-1',
@@ -18,9 +19,10 @@ function makeInteraction({ title, startTime, deferUpdateFails = false }) {
     channel: {
       send: jest.fn(async () => ({
         id: 'message-1',
-        startThread: jest.fn(async () => ({ id: 'thread-1' })),
+        startThread,
       })),
     },
+    startThread,
   };
 }
 
@@ -59,6 +61,15 @@ describe('handleCreateEventModal', () => {
 
     const event = getEventById(db, 1);
     expect(event).toMatchObject({ title: '普拉', capacity: 6, message_id: 'message-1', thread_id: 'thread-1' });
+  });
+
+  test('thread name is prefixed with the date parsed from 時間', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00' });
+
+    await handleCreateEventModal(interaction, db);
+
+    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 普拉' });
   });
 
   test('龍王 gets a capacity of 12', async () => {

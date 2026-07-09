@@ -89,7 +89,7 @@ async function handleCancelButton(interaction, db) {
 
   const result = removeSignup(db, event.id, interaction.user.id);
   if (result !== REMOVE_SIGNUP_OK) {
-    await interaction.reply({ content: '你還沒有報名喔', ephemeral: true });
+    await interaction.deferUpdate();
     return;
   }
 

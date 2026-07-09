@@ -121,7 +121,7 @@ describe('handleJoinModal', () => {
     expect(signup.class).toBe('冰雷');
   });
 
-  test('deletes the class-picker message and replies with a follow-up when the user already signed up', async () => {
+  test('deletes the class-picker message and sends no message when the user already signed up', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -134,7 +134,7 @@ describe('handleJoinModal', () => {
     await handleJoinModal(interaction2, db);
 
     expect(interaction2.deleteReply).toHaveBeenCalledTimes(1);
-    expect(interaction2.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '你已經報名囉', ephemeral: true }));
+    expect(interaction2.followUp).not.toHaveBeenCalled();
   });
 
   test('deletes the class-picker message and replies with a follow-up when the event is full', async () => {
