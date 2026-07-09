@@ -39,13 +39,13 @@ describe('buildClassButtonRows', () => {
 });
 
 describe('buildJoinDetailsModal', () => {
-  test('customId embeds the event id and chosen class, title mentions the class, and has 2 fields', () => {
+  test('customId embeds the event id and chosen class, title mentions the class, and has 2 plain text-input fields', () => {
     const modal = buildJoinDetailsModal(42, '冰雷');
     expect(modal.data.custom_id).toBe('join-modal:42:冰雷');
     expect(modal.data.title).toBe('報名揪團（冰雷）');
     expect(modal.components).toHaveLength(2);
-    expect(modal.components[0].data.label).toBe('等級');
-    expect(modal.components[1].data.label).toBe('遊戲 ID');
+    expect(modal.components[0].components[0].data.label).toBe('等級');
+    expect(modal.components[1].components[0].data.label).toBe('遊戲 ID');
   });
 });
 

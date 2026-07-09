@@ -6,6 +6,7 @@ const createEventCommand = require('./commands/create-event');
 const { handleCreateEventModal } = require('./interactions/create-event-modal');
 const { handleJoinModal } = require('./interactions/join-modal');
 const { handleSignupButton, handleClassChoiceButton, handleCancelButton } = require('./interactions/signup-button');
+const { handleTitleChoiceButton } = require('./interactions/title-choice-button');
 const { createInteractionHandler } = require('./interaction-router');
 
 const db = initDb(path.join(__dirname, '..', 'data.db'));
@@ -18,6 +19,7 @@ const handleInteraction = createInteractionHandler({
   handleJoinModal,
   handleSignupButton,
   handleClassChoiceButton,
+  handleTitleChoiceButton,
   handleCancelButton,
 });
 

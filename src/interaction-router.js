@@ -5,6 +5,7 @@ function createInteractionHandler({
   handleJoinModal,
   handleSignupButton,
   handleClassChoiceButton,
+  handleTitleChoiceButton,
   handleCancelButton,
 }) {
   return async function handleInteraction(interaction) {
@@ -18,12 +19,13 @@ function createInteractionHandler({
       const [action] = interaction.customId.split(':');
       if (action === 'signup') await handleSignupButton(interaction);
       if (action === 'class-choice') await handleClassChoiceButton(interaction);
+      if (action === 'title-choice') await handleTitleChoiceButton(interaction);
       if (action === 'cancel') await handleCancelButton(interaction, db);
       return;
     }
 
     if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'create-event-modal') {
+      if (interaction.customId.startsWith('create-event-modal:')) {
         await handleCreateEventModal(interaction, db);
         return;
       }

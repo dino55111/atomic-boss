@@ -1,11 +1,4 @@
-const {
-  SlashCommandBuilder,
-  ModalBuilder,
-  LabelBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  StringSelectMenuBuilder,
-} = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
 const TITLE_OPTIONS = ['普拉', '普炎', '困拉', '龍王', '蝴蝶王'];
 
@@ -13,44 +6,23 @@ const data = new SlashCommandBuilder()
   .setName('揪團')
   .setDescription('建立一個新的揪團報名');
 
-async function execute(interaction) {
-  const modal = new ModalBuilder()
-    .setCustomId('create-event-modal')
-    .setTitle('建立揪團');
+function buildTitleButtonRow() {
+  const buttons = TITLE_OPTIONS.map((title) =>
+    new ButtonBuilder()
+      .setCustomId(`title-choice:${title}`)
+      .setLabel(title)
+      .setStyle(ButtonStyle.Secondary),
+  );
 
-  const titleSelect = new StringSelectMenuBuilder()
-    .setCustomId('title')
-    .setPlaceholder('請選擇標題')
-    .setMinValues(1)
-    .setMaxValues(1)
-    .setRequired(true)
-    .addOptions(TITLE_OPTIONS.map((title) => ({ label: title, value: title })));
-
-  const titleLabel = new LabelBuilder()
-    .setLabel('標題')
-    .setStringSelectMenuComponent(titleSelect);
-
-  const capacityInput = new TextInputBuilder()
-    .setCustomId('capacity')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const capacityLabel = new LabelBuilder()
-    .setLabel('人數上限')
-    .setTextInputComponent(capacityInput);
-
-  const startTimeInput = new TextInputBuilder()
-    .setCustomId('start_time')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const startTimeLabel = new LabelBuilder()
-    .setLabel('時間')
-    .setTextInputComponent(startTimeInput);
-
-  modal.addLabelComponents(titleLabel, capacityLabel, startTimeLabel);
-
-  await interaction.showModal(modal);
+  return new ActionRowBuilder().addComponents(buttons);
 }
 
-module.exports = { data, execute, TITLE_OPTIONS };
+async function execute(interaction) {
+  await interaction.reply({
+    content: '請選擇標題：',
+    components: [buildTitleButtonRow()],
+    ephemeral: true,
+  });
+}
+
+module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS };

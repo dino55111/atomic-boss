@@ -1,6 +1,5 @@
 const {
   ModalBuilder,
-  LabelBuilder,
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
@@ -39,23 +38,20 @@ function buildJoinDetailsModal(eventId, className) {
 
   const levelInput = new TextInputBuilder()
     .setCustomId('level')
+    .setLabel('等級')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
-
-  const levelLabel = new LabelBuilder()
-    .setLabel('等級')
-    .setTextInputComponent(levelInput);
 
   const gameIdInput = new TextInputBuilder()
     .setCustomId('game_id')
+    .setLabel('遊戲 ID')
     .setStyle(TextInputStyle.Short)
     .setRequired(true);
 
-  const gameIdLabel = new LabelBuilder()
-    .setLabel('遊戲 ID')
-    .setTextInputComponent(gameIdInput);
-
-  modal.addLabelComponents(levelLabel, gameIdLabel);
+  modal.addComponents(
+    new ActionRowBuilder().addComponents(levelInput),
+    new ActionRowBuilder().addComponents(gameIdInput),
+  );
 
   return modal;
 }

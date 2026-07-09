@@ -1,15 +1,13 @@
 const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, parseCapacity } = require('../src/interactions/create-event-modal');
 
-function makeInteraction(fieldValues) {
+function makeInteraction({ title, fieldValues }) {
   return {
+    customId: `create-event-modal:${title}`,
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
-    fields: {
-      getTextInputValue: (id) => fieldValues[id],
-      getStringSelectValues: (id) => [fieldValues[id]],
-    },
+    fields: { getTextInputValue: (id) => fieldValues[id] },
     reply: jest.fn(async () => {}),
     fetchReply: jest.fn(async () => ({
       id: 'message-1',
@@ -31,9 +29,9 @@ describe('parseCapacity', () => {
 });
 
 describe('handleCreateEventModal', () => {
-  test('creates an event, posts the embed, and stores the resulting message id', async () => {
+  test('creates an event with the title embedded in the customId, posts the embed, and stores the resulting message id', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', capacity: '3', start_time: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', fieldValues: { capacity: '3', start_time: '7/12 20:00' } });
 
     await handleCreateEventModal(interaction, db);
 
@@ -48,7 +46,7 @@ describe('handleCreateEventModal', () => {
 
   test('replies with an error and does not create an event when capacity is invalid', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '週三夜間團', capacity: 'not-a-number', start_time: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', fieldValues: { capacity: 'not-a-number', start_time: '7/12 20:00' } });
 
     await handleCreateEventModal(interaction, db);
 

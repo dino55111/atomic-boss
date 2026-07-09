@@ -17,6 +17,7 @@ function makeHandlers(overrides = {}) {
     handleJoinModal: jest.fn(),
     handleSignupButton: jest.fn(),
     handleClassChoiceButton: jest.fn(),
+    handleTitleChoiceButton: jest.fn(),
     handleCancelButton: jest.fn(),
     ...overrides,
   };
@@ -54,6 +55,16 @@ describe('createInteractionHandler', () => {
     expect(handleClassChoiceButton).toHaveBeenCalledWith(interaction);
   });
 
+  test('routes title-choice button clicks to handleTitleChoiceButton', async () => {
+    const handleTitleChoiceButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleTitleChoiceButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'title-choice:普拉' });
+
+    await handle(interaction);
+
+    expect(handleTitleChoiceButton).toHaveBeenCalledWith(interaction);
+  });
+
   test('routes cancel button clicks to handleCancelButton with the db', async () => {
     const handleCancelButton = jest.fn(async () => {});
     const db = { marker: true };
@@ -69,7 +80,7 @@ describe('createInteractionHandler', () => {
     const handleCreateEventModal = jest.fn(async () => {});
     const db = { marker: true };
     const handle = createInteractionHandler(makeHandlers({ db, handleCreateEventModal }));
-    const interaction = makeBaseInteraction({ isModalSubmit: () => true, customId: 'create-event-modal' });
+    const interaction = makeBaseInteraction({ isModalSubmit: () => true, customId: 'create-event-modal:普拉' });
 
     await handle(interaction);
 
