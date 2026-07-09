@@ -34,10 +34,6 @@ function updateEventThreadId(db, eventId, threadId) {
   db.prepare('UPDATE events SET thread_id = ? WHERE id = ?').run(threadId, eventId);
 }
 
-function updateEventThreadMessageId(db, eventId, threadMessageId) {
-  db.prepare('UPDATE events SET thread_message_id = ? WHERE id = ?').run(threadMessageId, eventId);
-}
-
 function getSignups(db, eventId) {
   return db.prepare('SELECT * FROM signups WHERE event_id = ? ORDER BY signed_at ASC, id ASC').all(eventId);
 }
@@ -94,7 +90,6 @@ module.exports = {
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
-  updateEventThreadMessageId,
   getSignups,
   countSignups,
   hasSignedUp,

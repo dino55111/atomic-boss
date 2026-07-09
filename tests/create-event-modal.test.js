@@ -2,10 +2,6 @@ const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, parseCapacity } = require('../src/interactions/create-event-modal');
 
 function makeInteraction(fieldValues) {
-  const thread = {
-    id: 'thread-1',
-    send: jest.fn(async () => ({ id: 'thread-message-1' })),
-  };
   return {
     guildId: 'guild-1',
     channelId: 'channel-1',
@@ -14,9 +10,8 @@ function makeInteraction(fieldValues) {
     reply: jest.fn(async () => {}),
     fetchReply: jest.fn(async () => ({
       id: 'message-1',
-      startThread: jest.fn(async () => thread),
+      startThread: jest.fn(async () => ({ id: 'thread-1' })),
     })),
-    thread,
   };
 }
 
@@ -33,7 +28,7 @@ describe('parseCapacity', () => {
 });
 
 describe('handleCreateEventModal', () => {
-  test('posts an embed-only announcement and moves the report/cancel buttons into the thread', async () => {
+  test('creates an event, posts the embed, and stores the resulting message id', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '週三夜間團', capacity: '3', start_time: '7/12 20:00' });
 
@@ -42,20 +37,10 @@ describe('handleCreateEventModal', () => {
     expect(interaction.reply).toHaveBeenCalledTimes(1);
     const replyPayload = interaction.reply.mock.calls[0][0];
     expect(replyPayload.embeds).toHaveLength(1);
-    expect(replyPayload.components).toBeUndefined();
-
-    expect(interaction.thread.send).toHaveBeenCalledTimes(1);
-    const threadPayload = interaction.thread.send.mock.calls[0][0];
-    expect(threadPayload.components).toHaveLength(1);
+    expect(replyPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({
-      title: '週三夜間團',
-      capacity: 3,
-      message_id: 'message-1',
-      thread_id: 'thread-1',
-      thread_message_id: 'thread-message-1',
-    });
+    expect(event).toMatchObject({ title: '週三夜間團', capacity: 3, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
   test('replies with an error and does not create an event when capacity is invalid', async () => {

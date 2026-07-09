@@ -1,4 +1,4 @@
-const { initDb, createEvent, updateEventThreadId, updateEventThreadMessageId, addSignup } = require('../src/db/db');
+const { initDb, createEvent, updateEventThreadId, addSignup } = require('../src/db/db');
 const {
   buildClassButtonRows,
   buildJoinDetailsModal,
@@ -74,35 +74,27 @@ describe('handleClassChoiceButton', () => {
 });
 
 describe('handleCancelButton', () => {
-  test('removes an existing signup, edits the announcement embed and thread control buttons, and posts to the thread', async () => {
+  test('removes an existing signup, edits the message, and posts to the thread', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db);
     updateEventThreadId(db, event.id, 'thread-1');
-    updateEventThreadMessageId(db, event.id, 'thread-message-1');
     addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
 
-    const announcementMessage = { edit: jest.fn(async () => {}) };
-    const announcementChannel = { messages: { fetch: jest.fn(async () => announcementMessage) } };
-    const controlMessage = { edit: jest.fn(async () => {}) };
-    const threadChannel = {
-      messages: { fetch: jest.fn(async () => controlMessage) },
-      send: jest.fn(async () => {}),
-    };
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: threadChannel,
-      client: { channels: { fetch: jest.fn(async () => announcementChannel) } },
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
     };
 
     await handleCancelButton(interaction, db);
 
-    expect(interaction.client.channels.fetch).toHaveBeenCalledWith('channel-1');
-    expect(announcementMessage.edit).toHaveBeenCalledWith(expect.objectContaining({ embeds: expect.any(Array) }));
-    expect(threadChannel.messages.fetch).toHaveBeenCalledWith('thread-message-1');
-    expect(controlMessage.edit).toHaveBeenCalledWith(expect.objectContaining({ components: expect.any(Array) }));
-    expect(threadChannel.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
+    expect(editedMessage.edit).toHaveBeenCalledTimes(1);
+    expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
   });
 
