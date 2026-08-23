@@ -156,8 +156,36 @@ describe('handleAssistJoinModal', () => {
     expect(interaction.client.users.fetch).toHaveBeenCalledWith('user-9');
     const [signup] = getSignups(db, event.id);
     expect(signup).toMatchObject({ user_id: 'user-9', display_name: 'IceGuy', added_by_user_id: 'helper-1', is_external: 0 });
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-9>'));
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@helper-1> 代為報名'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-9>'),
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('由 <@helper-1> 代為報名'),
+      allowedMentions: { users: ['user-9', 'helper-1'] },
+    }));
+  });
+
+  test('falls back to the raw user id as display name when fetching the user fails', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+    interaction.client.users.fetch = jest.fn(async () => { throw new Error('Unknown User'); });
+
+    await expect(handleAssistJoinModal(interaction, db)).resolves.not.toThrow();
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup).toMatchObject({ user_id: 'user-9', display_name: 'user-9', added_by_user_id: 'helper-1', is_external: 0 });
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-9>'),
+    }));
   });
 
   test('signs up a non-Discord friend under a synthetic external id with the typed nickname', async () => {
@@ -179,8 +207,13 @@ describe('handleAssistJoinModal', () => {
     const [signup] = getSignups(db, event.id);
     expect(signup).toMatchObject({ display_name: '小明', added_by_user_id: 'helper-1', is_external: 1 });
     expect(signup.user_id.startsWith('ext:')).toBe(true);
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('**小明**'));
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@helper-1> 代為報名'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('**小明**'),
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('由 <@helper-1> 代為報名'),
+      allowedMentions: { users: ['helper-1'] },
+    }));
   });
 
   test('replies with a follow-up and does nothing when the event no longer exists', async () => {
@@ -193,7 +226,9 @@ describe('handleAssistJoinModal', () => {
 
     await handleAssistJoinModal(interaction, db);
 
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true }),
+    );
   });
 
   test('replies with a follow-up and does not sign up when the event is full', async () => {
@@ -215,5 +250,50 @@ describe('handleAssistJoinModal', () => {
     await handleAssistJoinModal(interaction, db);
 
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
+  });
+
+  test('silently does nothing when the target has already signed up', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    addSignup(db, event, { userId: 'user-9', displayName: 'IceGuy', className: '戰士', level: '70', gameId: 'a' });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '65', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(editedMessage.edit).not.toHaveBeenCalled();
+    expect(thread.send).not.toHaveBeenCalled();
+    expect(interaction.followUp).not.toHaveBeenCalled();
+    expect(getSignups(db, event.id)).toHaveLength(1);
+  });
+
+  test('includes the note segment in the thread message when provided', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1', note: '本尊的小號' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('備註：本尊的小號'),
+    }));
   });
 });

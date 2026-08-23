@@ -50,6 +50,7 @@ function buildAssistJoinModal(eventId, target, className) {
       .setCustomId('nickname')
       .setLabel('暱稱')
       .setStyle(TextInputStyle.Short)
+      .setMaxLength(32)
       .setRequired(true);
     rows.push(new ActionRowBuilder().addComponents(nicknameInput));
   }
@@ -58,12 +59,14 @@ function buildAssistJoinModal(eventId, target, className) {
     .setCustomId('level')
     .setLabel('等級')
     .setStyle(TextInputStyle.Short)
+    .setMaxLength(32)
     .setRequired(true);
 
   const gameIdInput = new TextInputBuilder()
     .setCustomId('game_id')
     .setLabel('遊戲 ID')
     .setStyle(TextInputStyle.Short)
+    .setMaxLength(64)
     .setRequired(true);
 
   const noteInput = new TextInputBuilder()
@@ -71,6 +74,7 @@ function buildAssistJoinModal(eventId, target, className) {
     .setLabel('備註')
     .setPlaceholder('可以填 XXX 的小號')
     .setStyle(TextInputStyle.Short)
+    .setMaxLength(100)
     .setRequired(false);
 
   rows.push(
@@ -119,6 +123,15 @@ function generateExternalUserId() {
   return `ext:${crypto.randomUUID()}`;
 }
 
+async function fetchDisplayName(client, target) {
+  try {
+    const user = await client.users.fetch(target);
+    return user.username;
+  } catch (error) {
+    return target;
+  }
+}
+
 async function handleAssistJoinModal(interaction, db) {
   const [, eventIdRaw, target, className] = interaction.customId.split(':');
   const eventId = Number.parseInt(eventIdRaw, 10);
@@ -143,7 +156,7 @@ async function handleAssistJoinModal(interaction, db) {
   const userId = isExternal ? generateExternalUserId() : target;
   const displayName = isExternal
     ? interaction.fields.getTextInputValue('nickname')
-    : (await interaction.client.users.fetch(target)).username;
+    : await fetchDisplayName(interaction.client, target);
 
   const result = addSignup(db, event, {
     userId,
@@ -176,7 +189,11 @@ async function handleAssistJoinModal(interaction, db) {
   const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
   const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`);
+  const mentionableUserIds = isExternal ? [interaction.user.id] : [userId, interaction.user.id];
+  await thread.send({
+    content: `${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`,
+    allowedMentions: { users: mentionableUserIds },
+  });
 }
 
 module.exports = {

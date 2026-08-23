@@ -147,6 +147,53 @@ describe('handleCancelButton', () => {
 
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
   });
+
+  test('silently acknowledges when the clicker has signups in the event but none they may cancel', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-2' },
+      reply: jest.fn(async () => {}),
+      deferUpdate: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn() } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.reply).not.toHaveBeenCalled();
+    expect(getSignups(db, event.id)).toHaveLength(1);
+  });
+
+  test('a member proxy-signed up by a helper can cancel their own entry, with no 代為取消 segment', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, {
+      userId: 'user-9', displayName: 'IceGuy', className: '冰雷', level: '70', gameId: 'ice#1',
+      addedByUserId: 'helper-1',
+    });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-9' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-9> 已取消報名'));
+    expect(thread.send).not.toHaveBeenCalledWith(expect.stringContaining('代為取消'));
+    expect(getSignups(db, event.id)).toHaveLength(0);
+  });
 });
 
 describe('handleCancelButton with multiple cancellable signups', () => {
