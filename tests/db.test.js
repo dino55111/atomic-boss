@@ -1,5 +1,7 @@
+const Database = require('better-sqlite3');
 const {
   initDb,
+  migrateSignupsTable,
   createEvent,
   getEventById,
   getEventByMessageId,
@@ -10,6 +12,8 @@ const {
   hasSignedUp,
   addSignup,
   removeSignup,
+  getSignupById,
+  removeSignupById,
   ADD_SIGNUP_OK,
   ADD_SIGNUP_FULL,
   ADD_SIGNUP_DUPLICATE,
@@ -124,5 +128,92 @@ describe('db', () => {
     addSignup(db, event, { userId: 'user-2', displayName: 'Bob', className: '法師', level: '65', gameId: 'bob#1' });
     const signups = getSignups(db, event.id);
     expect(signups.map((s) => s.user_id)).toEqual(['user-1', 'user-2']);
+  });
+
+  test('addSignup records added_by_user_id and is_external for an assisted signup', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, {
+      userId: 'ext:abc-123',
+      displayName: '小明',
+      className: '戰士',
+      level: '70',
+      gameId: 'ming#1',
+      addedByUserId: 'helper-1',
+      isExternal: true,
+    });
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.added_by_user_id).toBe('helper-1');
+    expect(signup.is_external).toBe(1);
+  });
+
+  test('addSignup defaults added_by_user_id to null and is_external to 0 for a self-signup', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.added_by_user_id).toBeNull();
+    expect(signup.is_external).toBe(0);
+  });
+
+  test('getSignupById returns the matching signup', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+    const [signup] = getSignups(db, event.id);
+
+    expect(getSignupById(db, signup.id)).toMatchObject({ id: signup.id, user_id: 'user-1' });
+  });
+
+  test('getSignupById returns undefined when the signup does not exist', () => {
+    const db = makeTestDb();
+    expect(getSignupById(db, 999)).toBeUndefined();
+  });
+
+  test('removeSignupById removes the matching signup', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+    const [signup] = getSignups(db, event.id);
+
+    const result = removeSignupById(db, signup.id);
+    expect(result).toBe(REMOVE_SIGNUP_OK);
+    expect(countSignups(db, event.id)).toBe(0);
+  });
+
+  test('removeSignupById returns NOT_FOUND when the signup does not exist', () => {
+    const db = makeTestDb();
+    expect(removeSignupById(db, 999)).toBe(REMOVE_SIGNUP_NOT_FOUND);
+  });
+
+  test('migrateSignupsTable adds the assist columns to an older signups table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE events (id INTEGER PRIMARY KEY, guild_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT NOT NULL, thread_id TEXT, title TEXT NOT NULL, capacity INTEGER NOT NULL, start_time TEXT NOT NULL, creator_id TEXT NOT NULL, created_at TEXT NOT NULL);
+      CREATE TABLE signups (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        event_id      INTEGER NOT NULL REFERENCES events(id),
+        user_id       TEXT NOT NULL,
+        display_name  TEXT NOT NULL,
+        class         TEXT NOT NULL,
+        level         TEXT NOT NULL,
+        game_id       TEXT NOT NULL,
+        note          TEXT NOT NULL DEFAULT '',
+        signed_at     TEXT NOT NULL,
+        UNIQUE(event_id, user_id)
+      );
+    `);
+
+    migrateSignupsTable(db);
+
+    const columns = db.prepare('PRAGMA table_info(signups)').all().map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['added_by_user_id', 'is_external']));
+  });
+
+  test('migrateSignupsTable is a no-op when the columns already exist', () => {
+    const db = makeTestDb();
+    expect(() => migrateSignupsTable(db)).not.toThrow();
   });
 });

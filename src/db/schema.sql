@@ -12,14 +12,16 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE TABLE IF NOT EXISTS signups (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id      INTEGER NOT NULL REFERENCES events(id),
-  user_id       TEXT NOT NULL,
-  display_name  TEXT NOT NULL,
-  class         TEXT NOT NULL,
-  level         TEXT NOT NULL,
-  game_id       TEXT NOT NULL,
-  note          TEXT NOT NULL DEFAULT '',
-  signed_at     TEXT NOT NULL,
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  event_id          INTEGER NOT NULL REFERENCES events(id),
+  user_id           TEXT NOT NULL,
+  display_name      TEXT NOT NULL,
+  class             TEXT NOT NULL,
+  level             TEXT NOT NULL,
+  game_id           TEXT NOT NULL,
+  note              TEXT NOT NULL DEFAULT '',
+  added_by_user_id  TEXT,
+  is_external       INTEGER NOT NULL DEFAULT 0,
+  signed_at         TEXT NOT NULL,
   UNIQUE(event_id, user_id)
 );

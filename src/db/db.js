@@ -2,10 +2,21 @@ const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
+function migrateSignupsTable(db) {
+  const columns = db.prepare('PRAGMA table_info(signups)').all().map((col) => col.name);
+  if (!columns.includes('added_by_user_id')) {
+    db.exec('ALTER TABLE signups ADD COLUMN added_by_user_id TEXT');
+  }
+  if (!columns.includes('is_external')) {
+    db.exec('ALTER TABLE signups ADD COLUMN is_external INTEGER NOT NULL DEFAULT 0');
+  }
+}
+
 function initDb(dbPath) {
   const db = new Database(dbPath);
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
+  migrateSignupsTable(db);
   return db;
 }
 
@@ -50,7 +61,16 @@ const ADD_SIGNUP_OK = 'OK';
 const ADD_SIGNUP_FULL = 'FULL';
 const ADD_SIGNUP_DUPLICATE = 'DUPLICATE';
 
-function addSignup(db, event, { userId, displayName, className, level, gameId, note = '' }) {
+function addSignup(db, event, {
+  userId,
+  displayName,
+  className,
+  level,
+  gameId,
+  note = '',
+  addedByUserId = null,
+  isExternal = false,
+}) {
   const transaction = db.transaction(() => {
     if (hasSignedUp(db, event.id, userId)) {
       return ADD_SIGNUP_DUPLICATE;
@@ -59,8 +79,8 @@ function addSignup(db, event, { userId, displayName, className, level, gameId, n
       return ADD_SIGNUP_FULL;
     }
     db.prepare(`
-      INSERT INTO signups (event_id, user_id, display_name, class, level, game_id, note, signed_at)
-      VALUES (@eventId, @userId, @displayName, @className, @level, @gameId, @note, @signedAt)
+      INSERT INTO signups (event_id, user_id, display_name, class, level, game_id, note, added_by_user_id, is_external, signed_at)
+      VALUES (@eventId, @userId, @displayName, @className, @level, @gameId, @note, @addedByUserId, @isExternal, @signedAt)
     `).run({
       eventId: event.id,
       userId,
@@ -69,6 +89,8 @@ function addSignup(db, event, { userId, displayName, className, level, gameId, n
       level,
       gameId,
       note,
+      addedByUserId,
+      isExternal: isExternal ? 1 : 0,
       signedAt: new Date().toISOString(),
     });
     return ADD_SIGNUP_OK;
@@ -84,8 +106,18 @@ function removeSignup(db, eventId, userId) {
   return info.changes > 0 ? REMOVE_SIGNUP_OK : REMOVE_SIGNUP_NOT_FOUND;
 }
 
+function getSignupById(db, id) {
+  return db.prepare('SELECT * FROM signups WHERE id = ?').get(id);
+}
+
+function removeSignupById(db, id) {
+  const info = db.prepare('DELETE FROM signups WHERE id = ?').run(id);
+  return info.changes > 0 ? REMOVE_SIGNUP_OK : REMOVE_SIGNUP_NOT_FOUND;
+}
+
 module.exports = {
   initDb,
+  migrateSignupsTable,
   createEvent,
   getEventById,
   getEventByMessageId,
@@ -96,6 +128,8 @@ module.exports = {
   hasSignedUp,
   addSignup,
   removeSignup,
+  getSignupById,
+  removeSignupById,
   ADD_SIGNUP_OK,
   ADD_SIGNUP_FULL,
   ADD_SIGNUP_DUPLICATE,
