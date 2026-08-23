@@ -1,4 +1,4 @@
-const { initDb, createEvent, updateEventThreadId, addSignup } = require('../src/db/db');
+const { initDb, createEvent, updateEventThreadId, addSignup, getSignups } = require('../src/db/db');
 const {
   buildClassButtonRows,
   buildClassButtonRowsForCustomIds,
@@ -6,6 +6,7 @@ const {
   handleSignupButton,
   handleClassChoiceButton,
   handleCancelButton,
+  handleCancelSelectButton,
   CLASS_OPTIONS,
 } = require('../src/interactions/signup-button');
 
@@ -145,5 +146,98 @@ describe('handleCancelButton', () => {
     await handleCancelButton(interaction, db);
 
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+});
+
+describe('handleCancelButton with multiple cancellable signups', () => {
+  test('shows a picker when the clicker has more than one cancellable signup', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'helper-1', displayName: 'Helper', className: '戰士', level: '70', gameId: 'h#1' });
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1',
+      addedByUserId: 'helper-1', isExternal: true,
+    });
+
+    const interaction = { customId: `cancel:${event.id}`, user: { id: 'helper-1' }, reply: jest.fn(async () => {}) };
+
+    await handleCancelButton(interaction, db);
+
+    expect(interaction.reply).toHaveBeenCalledTimes(1);
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.ephemeral).toBe(true);
+    expect(payload.content).toBe('請選擇要取消哪一筆報名：');
+    expect(payload.components[0].components).toHaveLength(2);
+  });
+
+  test('the event creator can cancel an external signup added by someone else', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5, creatorId: 'creator-1' });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1',
+      addedByUserId: 'helper-1', isExternal: true,
+    });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'creator-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('**小明**'));
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@creator-1> 代為取消'));
+    expect(getSignups(db, event.id)).toHaveLength(0);
+  });
+});
+
+describe('handleCancelSelectButton', () => {
+  test('cancels the chosen signup and updates the picker message', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1',
+      addedByUserId: 'helper-1', isExternal: true,
+    });
+    const [signup] = getSignups(db, event.id);
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = {
+      customId: `cancel-select:${event.id}:${signup.id}`,
+      user: { id: 'helper-1' },
+      update: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelSelectButton(interaction, db);
+
+    expect(getSignups(db, event.id)).toHaveLength(0);
+    expect(interaction.update).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
+  });
+
+  test('gracefully updates the message when the signup was already removed', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+
+    const interaction = {
+      customId: `cancel-select:${event.id}:999`,
+      user: { id: 'helper-1' },
+      update: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn() } },
+    };
+
+    await handleCancelSelectButton(interaction, db);
+
+    expect(interaction.update).toHaveBeenCalledWith(expect.objectContaining({ content: '這筆報名已經不存在了' }));
   });
 });
