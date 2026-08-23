@@ -39,6 +39,28 @@ describe('buildEventEmbed', () => {
     const countField = embed.data.fields.find((f) => f.name === '人數');
     expect(countField.value).toBe('1 / 2');
   });
+
+  test('renders a bold display name instead of a mention for an external (non-Discord) signup', () => {
+    const signups = [{ user_id: 'ext:1', display_name: '小明', class: '戰士', level: '70', game_id: 'ming#1', note: '', is_external: 1 }];
+    const embed = buildEventEmbed(baseEvent, signups);
+    const rosterField = embed.data.fields.find((f) => f.name === '名單');
+    expect(rosterField.value).toContain('**小明**');
+    expect(rosterField.value).not.toContain('<@ext:1>');
+  });
+
+  test('appends who assisted the signup when added_by_user_id is set', () => {
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1', note: '', added_by_user_id: 'helper-1' }];
+    const embed = buildEventEmbed(baseEvent, signups);
+    const rosterField = embed.data.fields.find((f) => f.name === '名單');
+    expect(rosterField.value).toContain('代報名：<@helper-1>');
+  });
+
+  test('omits the assist segment for a self-signup', () => {
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'alice#1', note: '' }];
+    const embed = buildEventEmbed(baseEvent, signups);
+    const rosterField = embed.data.fields.find((f) => f.name === '名單');
+    expect(rosterField.value).not.toContain('代報名');
+  });
 });
 
 describe('buildActionRow', () => {
@@ -52,8 +74,18 @@ describe('buildActionRow', () => {
     expect(row.components[0].data.disabled).toBe(true);
   });
 
+  test('assist button is enabled when there is room', () => {
+    const row = buildActionRow(baseEvent, 1);
+    expect(row.components[1].data.disabled).toBeFalsy();
+  });
+
+  test('assist button is disabled when the event is full', () => {
+    const row = buildActionRow(baseEvent, 2);
+    expect(row.components[1].data.disabled).toBe(true);
+  });
+
   test('cancel button is always enabled', () => {
     const row = buildActionRow(baseEvent, 2);
-    expect(row.components[1].data.disabled).toBeFalsy();
+    expect(row.components[2].data.disabled).toBeFalsy();
   });
 });

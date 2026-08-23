@@ -5,8 +5,10 @@ function buildEventEmbed(event, signups) {
     ? '目前尚無人報名'
     : signups
         .map((s, i) => {
+          const nameSegment = s.is_external ? `**${s.display_name}**` : `<@${s.user_id}>`;
           const noteSegment = s.note ? `／備註：${s.note}` : '';
-          return `${i + 1}. <@${s.user_id}>（職業：${s.class}／等級：${s.level}／ID：${s.game_id}${noteSegment}）`;
+          const assistSegment = s.added_by_user_id ? `／代報名：<@${s.added_by_user_id}>` : '';
+          return `${i + 1}. ${nameSegment}（職業：${s.class}／等級：${s.level}／ID：${s.game_id}${noteSegment}${assistSegment}）`;
         })
         .join('\n');
 
@@ -29,12 +31,18 @@ function buildActionRow(event, signupCount) {
     .setStyle(ButtonStyle.Primary)
     .setDisabled(isFull);
 
+  const assistButton = new ButtonBuilder()
+    .setCustomId(`assist:${event.id}`)
+    .setLabel('代報名')
+    .setStyle(ButtonStyle.Secondary)
+    .setDisabled(isFull);
+
   const cancelButton = new ButtonBuilder()
     .setCustomId(`cancel:${event.id}`)
     .setLabel('取消報名')
     .setStyle(ButtonStyle.Secondary);
 
-  return new ActionRowBuilder().addComponents(signupButton, cancelButton);
+  return new ActionRowBuilder().addComponents(signupButton, assistButton, cancelButton);
 }
 
 module.exports = { buildEventEmbed, buildActionRow };
