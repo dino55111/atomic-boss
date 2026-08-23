@@ -133,7 +133,10 @@ async function applyCancellation(interaction, db, event, signup) {
   const nameSegment = signup.is_external ? `**${signup.display_name}**` : `<@${signup.user_id}>`;
   const assistSegment = interaction.user.id === signup.user_id ? '' : `（由 <@${interaction.user.id}> 代為取消）`;
   const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`${nameSegment} 已取消報名${assistSegment}`);
+  await thread.send({
+    content: `${nameSegment} 已取消報名${assistSegment}`,
+    allowedMentions: { users: [signup.user_id, interaction.user.id] },
+  });
 }
 
 async function handleCancelButton(interaction, db) {

@@ -113,8 +113,33 @@ describe('handleCancelButton', () => {
 
     expect(editedMessage.edit).toHaveBeenCalledTimes(1);
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-1>'),
+    }));
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
+  });
+
+  test('scopes allowedMentions to prevent unparsed mention syntax in display_name from pinging', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      allowedMentions: { users: expect.arrayContaining(['user-1']) },
+    }));
   });
 
   test('silently acknowledges without any message when the user never signed up', async () => {
@@ -190,8 +215,12 @@ describe('handleCancelButton', () => {
 
     await handleCancelButton(interaction, db);
 
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-9> 已取消報名'));
-    expect(thread.send).not.toHaveBeenCalledWith(expect.stringContaining('代為取消'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-9> 已取消報名'),
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.not.stringContaining('代為取消'),
+    }));
     expect(getSignups(db, event.id)).toHaveLength(0);
   });
 });
@@ -239,8 +268,12 @@ describe('handleCancelButton with multiple cancellable signups', () => {
 
     await handleCancelButton(interaction, db);
 
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('**小明**'));
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@creator-1> 代為取消'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('**小明**'),
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('由 <@creator-1> 代為取消'),
+    }));
     expect(getSignups(db, event.id)).toHaveLength(0);
   });
 });
