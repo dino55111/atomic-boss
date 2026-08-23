@@ -65,9 +65,10 @@ describe('handleJoinModal', () => {
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(editedMessage.edit).toHaveBeenCalledTimes(1);
     expect(interaction.client.channels.fetch).toHaveBeenCalledWith('thread-1');
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-1>'));
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('本尊的小號'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('冰雷') }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('<@user-1>') }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('本尊的小號') }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ allowedMentions: { users: ['user-1'] } }));
     expect(interaction.followUp).not.toHaveBeenCalled();
 
     const [signup] = getSignups(db, event.id);
@@ -115,7 +116,7 @@ describe('handleJoinModal', () => {
     expect(interaction.deleteReply).not.toHaveBeenCalled();
     expect(interaction.followUp).not.toHaveBeenCalled();
     expect(editedMessage.edit).toHaveBeenCalledTimes(1);
-    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('冰雷'));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('冰雷') }));
 
     const [signup] = getSignups(db, event.id);
     expect(signup.class).toBe('冰雷');

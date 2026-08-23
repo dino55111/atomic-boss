@@ -59,7 +59,10 @@ async function handleJoinModal(interaction, db) {
 
   const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);
-  await thread.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}）`);
+  await thread.send({
+    content: `<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}）`,
+    allowedMentions: { users: [interaction.user.id] },
+  });
 }
 
 module.exports = { handleJoinModal, getOptionalTextInputValue };
