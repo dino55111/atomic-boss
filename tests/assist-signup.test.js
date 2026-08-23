@@ -1,3 +1,4 @@
+const { initDb, createEvent, updateEventThreadId, getSignups, addSignup } = require('../src/db/db');
 const {
   EXTERNAL_TARGET,
   buildAssistTargetPickerRows,
@@ -7,6 +8,7 @@ const {
   handleAssistUserSelect,
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
+  handleAssistJoinModal,
 } = require('../src/interactions/assist-signup');
 const { CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
@@ -91,5 +93,127 @@ describe('handleAssistClassChoiceButton', () => {
     expect(interaction.showModal).toHaveBeenCalledTimes(1);
     const modal = interaction.showModal.mock.calls[0][0];
     expect(modal.data.custom_id).toBe('assist-join-modal:42:user-9:冰雷');
+  });
+});
+
+function makeEvent(db, overrides = {}) {
+  const event = createEvent(db, {
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    messageId: 'message-1',
+    title: '週三夜間團',
+    capacity: 2,
+    startTime: '7/12 20:00',
+    creatorId: 'creator-1',
+    ...overrides,
+  });
+  updateEventThreadId(db, event.id, 'thread-1');
+  return event;
+}
+
+function makeAssistModalInteraction({ customId, helperId, fieldValues, fetchedUser, fetchedMessage, thread }) {
+  const fieldEntries = new Map(Object.entries(fieldValues).map(([id, value]) => [id, { value }]));
+  return {
+    customId,
+    user: { id: helperId, username: helperId },
+    fields: {
+      getTextInputValue: (id) => {
+        if (!fieldEntries.has(id)) {
+          throw new Error(`Required field with custom id "${id}" not found.`);
+        }
+        return fieldEntries.get(id).value;
+      },
+      fields: fieldEntries,
+    },
+    deferUpdate: jest.fn(async () => {}),
+    deleteReply: jest.fn(async () => {}),
+    followUp: jest.fn(async () => {}),
+    channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
+    client: {
+      channels: { fetch: jest.fn(async () => thread) },
+      users: { fetch: jest.fn(async () => fetchedUser) },
+    },
+  };
+}
+
+describe('handleAssistJoinModal', () => {
+  test('signs up a real member under their own user id, tagged with who assisted them', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.client.users.fetch).toHaveBeenCalledWith('user-9');
+    const [signup] = getSignups(db, event.id);
+    expect(signup).toMatchObject({ user_id: 'user-9', display_name: 'IceGuy', added_by_user_id: 'helper-1', is_external: 0 });
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('<@user-9>'));
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@helper-1> 代為報名'));
+  });
+
+  test('signs up a non-Discord friend under a synthetic external id with the typed nickname', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:external:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { nickname: '小明', level: '70', game_id: 'ming#1' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.client.users.fetch).not.toHaveBeenCalled();
+    const [signup] = getSignups(db, event.id);
+    expect(signup).toMatchObject({ display_name: '小明', added_by_user_id: 'helper-1', is_external: 1 });
+    expect(signup.user_id.startsWith('ext:')).toBe(true);
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('**小明**'));
+    expect(thread.send).toHaveBeenCalledWith(expect.stringContaining('由 <@helper-1> 代為報名'));
+  });
+
+  test('replies with a follow-up and does nothing when the event no longer exists', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeAssistModalInteraction({
+      customId: 'assist-join-modal:999:user-9:冰雷',
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+
+  test('replies with a follow-up and does not sign up when the event is full', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 1 });
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a' });
+
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
   });
 });

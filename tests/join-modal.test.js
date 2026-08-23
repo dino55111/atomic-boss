@@ -1,5 +1,5 @@
 const { initDb, createEvent, updateEventThreadId, getSignups } = require('../src/db/db');
-const { handleJoinModal } = require('../src/interactions/join-modal');
+const { handleJoinModal, getOptionalTextInputValue } = require('../src/interactions/join-modal');
 
 function makeEvent(db, overrides = {}) {
   const event = createEvent(db, {
@@ -160,5 +160,17 @@ describe('handleJoinModal', () => {
 
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+});
+
+describe('getOptionalTextInputValue', () => {
+  test('returns the field value when present', () => {
+    const fields = { fields: new Map([['note', { value: 'hi' }]]) };
+    expect(getOptionalTextInputValue(fields, 'note')).toBe('hi');
+  });
+
+  test('returns an empty string when the field is absent', () => {
+    const fields = { fields: new Map() };
+    expect(getOptionalTextInputValue(fields, 'note')).toBe('');
   });
 });

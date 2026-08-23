@@ -62,4 +62,4 @@ async function handleJoinModal(interaction, db) {
   await thread.send(`<@${interaction.user.id}> 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}）`);
 }
 
-module.exports = { handleJoinModal };
+module.exports = { handleJoinModal, getOptionalTextInputValue };
