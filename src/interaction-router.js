@@ -7,11 +7,23 @@ function createInteractionHandler({
   handleClassChoiceButton,
   handleTitleChoiceButton,
   handleCancelButton,
+  handleCancelSelectButton,
+  handleAssistButton,
+  handleAssistUserSelect,
+  handleAssistExternalButton,
+  handleAssistClassChoiceButton,
+  handleAssistJoinModal,
 }) {
   return async function handleInteraction(interaction) {
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);
       if (command) await command.execute(interaction);
+      return;
+    }
+
+    if (interaction.isUserSelectMenu()) {
+      const [action] = interaction.customId.split(':');
+      if (action === 'assist-user-select') await handleAssistUserSelect(interaction);
       return;
     }
 
@@ -21,6 +33,10 @@ function createInteractionHandler({
       if (action === 'class-choice') await handleClassChoiceButton(interaction);
       if (action === 'title-choice') await handleTitleChoiceButton(interaction);
       if (action === 'cancel') await handleCancelButton(interaction, db);
+      if (action === 'cancel-select') await handleCancelSelectButton(interaction, db);
+      if (action === 'assist') await handleAssistButton(interaction);
+      if (action === 'assist-external') await handleAssistExternalButton(interaction);
+      if (action === 'assist-class-choice') await handleAssistClassChoiceButton(interaction);
       return;
     }
 
@@ -31,6 +47,10 @@ function createInteractionHandler({
       }
       if (interaction.customId.startsWith('join-modal:')) {
         await handleJoinModal(interaction, db);
+        return;
+      }
+      if (interaction.customId.startsWith('assist-join-modal:')) {
+        await handleAssistJoinModal(interaction, db);
       }
     }
   };

@@ -3,6 +3,7 @@ const { createInteractionHandler } = require('../src/interaction-router');
 function makeBaseInteraction(overrides = {}) {
   return {
     isChatInputCommand: () => false,
+    isUserSelectMenu: () => false,
     isButton: () => false,
     isModalSubmit: () => false,
     ...overrides,
@@ -19,6 +20,12 @@ function makeHandlers(overrides = {}) {
     handleClassChoiceButton: jest.fn(),
     handleTitleChoiceButton: jest.fn(),
     handleCancelButton: jest.fn(),
+    handleCancelSelectButton: jest.fn(),
+    handleAssistButton: jest.fn(),
+    handleAssistUserSelect: jest.fn(),
+    handleAssistExternalButton: jest.fn(),
+    handleAssistClassChoiceButton: jest.fn(),
+    handleAssistJoinModal: jest.fn(),
     ...overrides,
   };
 }
@@ -96,5 +103,67 @@ describe('createInteractionHandler', () => {
     await handle(interaction);
 
     expect(handleJoinModal).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes assist-user-select menu submissions to handleAssistUserSelect', async () => {
+    const handleAssistUserSelect = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleAssistUserSelect }));
+    const interaction = makeBaseInteraction({ isUserSelectMenu: () => true, customId: 'assist-user-select:1' });
+
+    await handle(interaction);
+
+    expect(handleAssistUserSelect).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes assist button clicks to handleAssistButton', async () => {
+    const handleAssistButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleAssistButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'assist:1' });
+
+    await handle(interaction);
+
+    expect(handleAssistButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes assist-external button clicks to handleAssistExternalButton', async () => {
+    const handleAssistExternalButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleAssistExternalButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'assist-external:1' });
+
+    await handle(interaction);
+
+    expect(handleAssistExternalButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes assist-class-choice button clicks to handleAssistClassChoiceButton', async () => {
+    const handleAssistClassChoiceButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleAssistClassChoiceButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'assist-class-choice:1:user-9:冰雷' });
+
+    await handle(interaction);
+
+    expect(handleAssistClassChoiceButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes cancel-select button clicks to handleCancelSelectButton with the db', async () => {
+    const handleCancelSelectButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleCancelSelectButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'cancel-select:1:5' });
+
+    await handle(interaction);
+
+    expect(handleCancelSelectButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes assist-join-modal submissions to handleAssistJoinModal with the db', async () => {
+    const handleAssistJoinModal = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleAssistJoinModal }));
+    const interaction = makeBaseInteraction({ isModalSubmit: () => true, customId: 'assist-join-modal:1:user-9:冰雷' });
+
+    await handle(interaction);
+
+    expect(handleAssistJoinModal).toHaveBeenCalledWith(interaction, db);
   });
 });

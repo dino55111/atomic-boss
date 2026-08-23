@@ -5,8 +5,20 @@ const { initDb } = require('./db/db');
 const createEventCommand = require('./commands/create-event');
 const { handleCreateEventModal } = require('./interactions/create-event-modal');
 const { handleJoinModal } = require('./interactions/join-modal');
-const { handleSignupButton, handleClassChoiceButton, handleCancelButton } = require('./interactions/signup-button');
+const {
+  handleSignupButton,
+  handleClassChoiceButton,
+  handleCancelButton,
+  handleCancelSelectButton,
+} = require('./interactions/signup-button');
 const { handleTitleChoiceButton } = require('./interactions/title-choice-button');
+const {
+  handleAssistButton,
+  handleAssistUserSelect,
+  handleAssistExternalButton,
+  handleAssistClassChoiceButton,
+  handleAssistJoinModal,
+} = require('./interactions/assist-signup');
 const { createInteractionHandler } = require('./interaction-router');
 
 const db = initDb(path.join(__dirname, '..', 'data.db'));
@@ -21,6 +33,12 @@ const handleInteraction = createInteractionHandler({
   handleClassChoiceButton,
   handleTitleChoiceButton,
   handleCancelButton,
+  handleCancelSelectButton,
+  handleAssistButton,
+  handleAssistUserSelect,
+  handleAssistExternalButton,
+  handleAssistClassChoiceButton,
+  handleAssistJoinModal,
 });
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
