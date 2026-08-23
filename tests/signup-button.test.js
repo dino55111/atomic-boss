@@ -1,6 +1,7 @@
 const { initDb, createEvent, updateEventThreadId, addSignup } = require('../src/db/db');
 const {
   buildClassButtonRows,
+  buildClassButtonRowsForCustomIds,
   buildJoinDetailsModal,
   handleSignupButton,
   handleClassChoiceButton,
@@ -35,6 +36,14 @@ describe('buildClassButtonRows', () => {
     const rows = buildClassButtonRows(42);
     const firstButton = rows[0].components[0];
     expect(firstButton.data.custom_id).toBe(`class-choice:42:${CLASS_OPTIONS[0]}`);
+  });
+});
+
+describe('buildClassButtonRowsForCustomIds', () => {
+  test('builds the same 3x4 grid using a caller-supplied customId per class', () => {
+    const rows = buildClassButtonRowsForCustomIds((className) => `custom:${className}`);
+    expect(rows).toHaveLength(3);
+    expect(rows[0].components[0].data.custom_id).toBe(`custom:${CLASS_OPTIONS[0]}`);
   });
 });
 

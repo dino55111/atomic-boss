@@ -16,10 +16,10 @@ const CLASS_OPTIONS = [
 
 const CLASS_BUTTONS_PER_ROW = 4;
 
-function buildClassButtonRows(eventId) {
+function buildClassButtonRowsForCustomIds(customIdForClass) {
   const buttons = CLASS_OPTIONS.map((className) =>
     new ButtonBuilder()
-      .setCustomId(`class-choice:${eventId}:${className}`)
+      .setCustomId(customIdForClass(className))
       .setLabel(className)
       .setStyle(ButtonStyle.Secondary),
   );
@@ -29,6 +29,10 @@ function buildClassButtonRows(eventId) {
     rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + CLASS_BUTTONS_PER_ROW)));
   }
   return rows;
+}
+
+function buildClassButtonRows(eventId) {
+  return buildClassButtonRowsForCustomIds((className) => `class-choice:${eventId}:${className}`);
 }
 
 function buildJoinDetailsModal(eventId, className) {
@@ -108,6 +112,7 @@ async function handleCancelButton(interaction, db) {
 
 module.exports = {
   buildClassButtonRows,
+  buildClassButtonRowsForCustomIds,
   buildJoinDetailsModal,
   handleSignupButton,
   handleClassChoiceButton,
