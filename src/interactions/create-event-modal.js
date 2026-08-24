@@ -56,8 +56,7 @@ async function handleCreateEventModal(interaction, db) {
   const message = await interaction.channel.send({ embeds: [embed], components: [row] });
   updateEventMessageId(db, event.id, message.id);
 
-  const datePart = startTime.split(' ')[0];
-  const thread = await message.startThread({ name: `${datePart} ${title}`.slice(0, 100) });
+  const thread = await message.startThread({ name: `${startTime} ${title}`.slice(0, 100) });
   updateEventThreadId(db, event.id, thread.id);
 }
 
