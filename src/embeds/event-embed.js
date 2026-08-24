@@ -16,6 +16,7 @@ function buildEventEmbed(event, signups) {
     .setTitle(event.title)
     .addFields(
       { name: '時間', value: event.start_time, inline: true },
+      { name: '場次', value: `第${event.session}場`, inline: true },
       { name: '人數', value: `${signups.length} / ${event.capacity}`, inline: true },
       { name: '名單', value: roster },
     )

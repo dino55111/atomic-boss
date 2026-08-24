@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS events (
   thread_id     TEXT,
   title         TEXT NOT NULL,
   capacity      INTEGER NOT NULL,
+  session       INTEGER NOT NULL DEFAULT 1,
   start_time    TEXT NOT NULL,
   creator_id    TEXT NOT NULL,
   created_at    TEXT NOT NULL

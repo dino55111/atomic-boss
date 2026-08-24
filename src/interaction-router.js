@@ -6,6 +6,7 @@ function createInteractionHandler({
   handleSignupButton,
   handleClassChoiceButton,
   handleTitleChoiceButton,
+  handleSessionChoiceButton,
   handleCancelButton,
   handleCancelSelectButton,
   handleAssistButton,
@@ -32,6 +33,7 @@ function createInteractionHandler({
       if (action === 'signup') await handleSignupButton(interaction);
       if (action === 'class-choice') await handleClassChoiceButton(interaction);
       if (action === 'title-choice') await handleTitleChoiceButton(interaction);
+      if (action === 'session-choice') await handleSessionChoiceButton(interaction);
       if (action === 'cancel') await handleCancelButton(interaction, db);
       if (action === 'cancel-select') await handleCancelSelectButton(interaction, db);
       if (action === 'assist') await handleAssistButton(interaction);

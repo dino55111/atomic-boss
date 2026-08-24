@@ -1,10 +1,10 @@
 const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
-function makeInteraction({ title, startTime, deferUpdateFails = false }) {
+function makeInteraction({ title, session = 1, startTime, deferUpdateFails = false }) {
   const startThread = jest.fn(async () => ({ id: 'thread-1' }));
   return {
-    customId: `create-event-modal:${title}`,
+    customId: `create-event-modal:${title}:${session}`,
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
@@ -60,16 +60,26 @@ describe('handleCreateEventModal', () => {
     expect(sentPayload.components).toHaveLength(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '普拉', capacity: 6, message_id: 'message-1', thread_id: 'thread-1' });
+    expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
-  test('thread name is prefixed with the full 時間', async () => {
+  test('thread name is prefixed with the full 時間 and suffixed with the chosen session', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', session: 3, startTime: '7/12 20:00' });
 
     await handleCreateEventModal(interaction, db);
 
-    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 20:00 普拉' });
+    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 20:00 普拉 第3場' });
+  });
+
+  test('stores the chosen session number on the event', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉', session: 5, startTime: '7/12 20:00' });
+
+    await handleCreateEventModal(interaction, db);
+
+    const event = getEventById(db, 1);
+    expect(event.session).toBe(5);
   });
 
   test('龍王 gets a capacity of 12', async () => {

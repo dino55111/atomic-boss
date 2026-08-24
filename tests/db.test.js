@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const {
   initDb,
   migrateSignupsTable,
+  migrateEventsTable,
   createEvent,
   getEventById,
   getEventByMessageId,
@@ -238,5 +239,45 @@ describe('db', () => {
     const db = makeTestDb();
     const event = makeTestEvent(db);
     expect(getSignupByEventAndUser(db, event.id, 'user-9')).toBeUndefined();
+  });
+
+  test('createEvent stores the chosen session number', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db, { session: 3 });
+    expect(event.session).toBe(3);
+  });
+
+  test('createEvent defaults session to 1 when omitted', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(event.session).toBe(1);
+  });
+
+  test('migrateEventsTable adds the session column to an older events table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id      TEXT NOT NULL,
+        channel_id    TEXT NOT NULL,
+        message_id    TEXT NOT NULL,
+        thread_id     TEXT,
+        title         TEXT NOT NULL,
+        capacity      INTEGER NOT NULL,
+        start_time    TEXT NOT NULL,
+        creator_id    TEXT NOT NULL,
+        created_at    TEXT NOT NULL
+      );
+    `);
+
+    migrateEventsTable(db);
+
+    const columns = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['session']));
+  });
+
+  test('migrateEventsTable is a no-op when the column already exists', () => {
+    const db = makeTestDb();
+    expect(() => migrateEventsTable(db)).not.toThrow();
   });
 });

@@ -11,7 +11,7 @@ const {
   handleCancelButton,
   handleCancelSelectButton,
 } = require('./interactions/signup-button');
-const { handleTitleChoiceButton } = require('./interactions/title-choice-button');
+const { handleTitleChoiceButton, handleSessionChoiceButton } = require('./interactions/title-choice-button');
 const {
   handleAssistButton,
   handleAssistUserSelect,
@@ -32,6 +32,7 @@ const handleInteraction = createInteractionHandler({
   handleSignupButton,
   handleClassChoiceButton,
   handleTitleChoiceButton,
+  handleSessionChoiceButton,
   handleCancelButton,
   handleCancelSelectButton,
   handleAssistButton,

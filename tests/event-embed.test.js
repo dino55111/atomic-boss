@@ -1,8 +1,14 @@
 const { buildEventEmbed, buildActionRow } = require('../src/embeds/event-embed');
 
-const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, start_time: '7/12 20:00' };
+const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00' };
 
 describe('buildEventEmbed', () => {
+  test('shows the session field', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    const sessionField = embed.data.fields.find((f) => f.name === '場次');
+    expect(sessionField.value).toBe('第3場');
+  });
+
   test('shows placeholder text when there are no signups', () => {
     const embed = buildEventEmbed(baseEvent, []);
     const rosterField = embed.data.fields.find((f) => f.name === '名單');

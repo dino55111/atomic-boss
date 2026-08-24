@@ -19,6 +19,7 @@ function makeHandlers(overrides = {}) {
     handleSignupButton: jest.fn(),
     handleClassChoiceButton: jest.fn(),
     handleTitleChoiceButton: jest.fn(),
+    handleSessionChoiceButton: jest.fn(),
     handleCancelButton: jest.fn(),
     handleCancelSelectButton: jest.fn(),
     handleAssistButton: jest.fn(),
@@ -70,6 +71,16 @@ describe('createInteractionHandler', () => {
     await handle(interaction);
 
     expect(handleTitleChoiceButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes session-choice button clicks to handleSessionChoiceButton', async () => {
+    const handleSessionChoiceButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleSessionChoiceButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'session-choice:普拉:3' });
+
+    await handle(interaction);
+
+    expect(handleSessionChoiceButton).toHaveBeenCalledWith(interaction);
   });
 
   test('routes cancel button clicks to handleCancelButton with the db', async () => {

@@ -20,7 +20,8 @@ function isValidStartTime(rawStartTime) {
 }
 
 async function handleCreateEventModal(interaction, db) {
-  const title = interaction.customId.split(':')[1];
+  const [, title, sessionRaw] = interaction.customId.split(':');
+  const session = Number.parseInt(sessionRaw, 10);
   const startTime = interaction.fields.getTextInputValue('start_time');
   const capacity = TITLE_CAPACITIES[title];
 
@@ -46,6 +47,7 @@ async function handleCreateEventModal(interaction, db) {
     messageId: 'pending',
     title,
     capacity,
+    session,
     startTime,
     creatorId: interaction.user.id,
   });
@@ -56,7 +58,7 @@ async function handleCreateEventModal(interaction, db) {
   const message = await interaction.channel.send({ embeds: [embed], components: [row] });
   updateEventMessageId(db, event.id, message.id);
 
-  const thread = await message.startThread({ name: `${startTime} ${title}`.slice(0, 100) });
+  const thread = await message.startThread({ name: `${startTime} ${title} 第${session}場`.slice(0, 100) });
   updateEventThreadId(db, event.id, thread.id);
 }
 

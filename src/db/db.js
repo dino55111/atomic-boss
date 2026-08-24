@@ -12,20 +12,28 @@ function migrateSignupsTable(db) {
   }
 }
 
+function migrateEventsTable(db) {
+  const columns = db.prepare('PRAGMA table_info(events)').all().map((col) => col.name);
+  if (!columns.includes('session')) {
+    db.exec('ALTER TABLE events ADD COLUMN session INTEGER NOT NULL DEFAULT 1');
+  }
+}
+
 function initDb(dbPath) {
   const db = new Database(dbPath);
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
   migrateSignupsTable(db);
+  migrateEventsTable(db);
   return db;
 }
 
-function createEvent(db, { guildId, channelId, messageId, title, capacity, startTime, creatorId }) {
+function createEvent(db, { guildId, channelId, messageId, title, capacity, session = 1, startTime, creatorId }) {
   const createdAt = new Date().toISOString();
   const info = db.prepare(`
-    INSERT INTO events (guild_id, channel_id, message_id, title, capacity, start_time, creator_id, created_at)
-    VALUES (@guildId, @channelId, @messageId, @title, @capacity, @startTime, @creatorId, @createdAt)
-  `).run({ guildId, channelId, messageId, title, capacity, startTime, creatorId, createdAt });
+    INSERT INTO events (guild_id, channel_id, message_id, title, capacity, session, start_time, creator_id, created_at)
+    VALUES (@guildId, @channelId, @messageId, @title, @capacity, @session, @startTime, @creatorId, @createdAt)
+  `).run({ guildId, channelId, messageId, title, capacity, session, startTime, creatorId, createdAt });
   return getEventById(db, info.lastInsertRowid);
 }
 
@@ -122,6 +130,7 @@ function removeSignupById(db, id) {
 module.exports = {
   initDb,
   migrateSignupsTable,
+  migrateEventsTable,
   createEvent,
   getEventById,
   getEventByMessageId,

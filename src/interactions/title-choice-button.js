@@ -1,8 +1,11 @@
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-function buildCreateEventModal(title) {
+const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
+const SESSION_BUTTONS_PER_ROW = 5;
+
+function buildCreateEventModal(title, session) {
   const modal = new ModalBuilder()
-    .setCustomId(`create-event-modal:${title}`)
+    .setCustomId(`create-event-modal:${title}:${session}`)
     .setTitle(`建立揪團（${title}）`);
 
   const startTimeInput = new TextInputBuilder()
@@ -17,9 +20,38 @@ function buildCreateEventModal(title) {
   return modal;
 }
 
-async function handleTitleChoiceButton(interaction) {
-  const title = interaction.customId.split(':')[1];
-  await interaction.showModal(buildCreateEventModal(title));
+function buildSessionButtonRow(title) {
+  const buttons = SESSION_OPTIONS.map((session) =>
+    new ButtonBuilder()
+      .setCustomId(`session-choice:${title}:${session}`)
+      .setLabel(`第${session}場`)
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += SESSION_BUTTONS_PER_ROW) {
+    rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + SESSION_BUTTONS_PER_ROW)));
+  }
+  return rows;
 }
 
-module.exports = { buildCreateEventModal, handleTitleChoiceButton };
+async function handleTitleChoiceButton(interaction) {
+  const title = interaction.customId.split(':')[1];
+  await interaction.update({
+    content: '請選擇場次：',
+    components: buildSessionButtonRow(title),
+  });
+}
+
+async function handleSessionChoiceButton(interaction) {
+  const [, title, session] = interaction.customId.split(':');
+  await interaction.showModal(buildCreateEventModal(title, session));
+}
+
+module.exports = {
+  buildCreateEventModal,
+  buildSessionButtonRow,
+  handleTitleChoiceButton,
+  handleSessionChoiceButton,
+  SESSION_OPTIONS,
+};
