@@ -110,6 +110,10 @@ function getSignupById(db, id) {
   return db.prepare('SELECT * FROM signups WHERE id = ?').get(id);
 }
 
+function getSignupByEventAndUser(db, eventId, userId) {
+  return db.prepare('SELECT * FROM signups WHERE event_id = ? AND user_id = ?').get(eventId, userId);
+}
+
 function removeSignupById(db, id) {
   const info = db.prepare('DELETE FROM signups WHERE id = ?').run(id);
   return info.changes > 0 ? REMOVE_SIGNUP_OK : REMOVE_SIGNUP_NOT_FOUND;
@@ -129,6 +133,7 @@ module.exports = {
   addSignup,
   removeSignup,
   getSignupById,
+  getSignupByEventAndUser,
   removeSignupById,
   ADD_SIGNUP_OK,
   ADD_SIGNUP_FULL,

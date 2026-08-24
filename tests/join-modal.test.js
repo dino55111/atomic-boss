@@ -1,4 +1,4 @@
-const { initDb, createEvent, updateEventThreadId, getSignups } = require('../src/db/db');
+const { initDb, createEvent, updateEventThreadId, getSignups, addSignup } = require('../src/db/db');
 const { handleJoinModal, getOptionalTextInputValue } = require('../src/interactions/join-modal');
 
 function makeEvent(db, overrides = {}) {
@@ -122,7 +122,7 @@ describe('handleJoinModal', () => {
     expect(signup.class).toBe('冰雷');
   });
 
-  test('deletes the class-picker message and sends no message when the user already signed up', async () => {
+  test('deletes the class-picker message and sends no message when the user already signed up themselves', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 2 });
     const editedMessage = { edit: jest.fn(async () => {}) };
@@ -136,6 +136,40 @@ describe('handleJoinModal', () => {
 
     expect(interaction2.deleteReply).toHaveBeenCalledTimes(1);
     expect(interaction2.followUp).not.toHaveBeenCalled();
+  });
+
+  test('tells the user who assisted them when they try to self-signup after being 代報名', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 2 });
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    addSignup(db, event, {
+      userId: 'user-1',
+      displayName: 'Alice',
+      className: '戰士',
+      level: '70',
+      gameId: 'alice#1',
+      addedByUserId: 'helper-1',
+    });
+
+    const interaction = makeInteraction({
+      eventId: event.id,
+      className: '冰雷',
+      userId: 'user-1',
+      fieldValues: { level: '65', game_id: 'alice#2' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleJoinModal(interaction, db);
+
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@helper-1>'),
+      ephemeral: true,
+    }));
+    expect(editedMessage.edit).not.toHaveBeenCalled();
+    expect(thread.send).not.toHaveBeenCalled();
   });
 
   test('deletes the class-picker message and replies with a follow-up when the event is full', async () => {

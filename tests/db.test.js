@@ -13,6 +13,7 @@ const {
   addSignup,
   removeSignup,
   getSignupById,
+  getSignupByEventAndUser,
   removeSignupById,
   ADD_SIGNUP_OK,
   ADD_SIGNUP_FULL,
@@ -215,5 +216,27 @@ describe('db', () => {
   test('migrateSignupsTable is a no-op when the columns already exist', () => {
     const db = makeTestDb();
     expect(() => migrateSignupsTable(db)).not.toThrow();
+  });
+
+  test('getSignupByEventAndUser returns the matching signup', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    addSignup(db, event, {
+      userId: 'user-9',
+      displayName: 'IceGuy',
+      className: '冰雷',
+      level: '70',
+      gameId: 'ice#1',
+      addedByUserId: 'helper-1',
+    });
+
+    const signup = getSignupByEventAndUser(db, event.id, 'user-9');
+    expect(signup).toMatchObject({ user_id: 'user-9', added_by_user_id: 'helper-1' });
+  });
+
+  test('getSignupByEventAndUser returns undefined when there is no signup for that user', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(getSignupByEventAndUser(db, event.id, 'user-9')).toBeUndefined();
   });
 });

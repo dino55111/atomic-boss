@@ -1,4 +1,11 @@
-const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
+const {
+  getEventById,
+  addSignup,
+  getSignups,
+  getSignupByEventAndUser,
+  ADD_SIGNUP_FULL,
+  ADD_SIGNUP_DUPLICATE,
+} = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 
@@ -41,6 +48,15 @@ async function handleJoinModal(interaction, db) {
   });
 
   if (result === ADD_SIGNUP_DUPLICATE) {
+    if (acked) {
+      const existing = getSignupByEventAndUser(db, event.id, interaction.user.id);
+      if (existing.added_by_user_id) {
+        await interaction.followUp({
+          content: `你已經被 <@${existing.added_by_user_id}> 代報名了，如需修改請先「取消報名」再重新填寫`,
+          ephemeral: true,
+        });
+      }
+    }
     return;
   }
   if (result === ADD_SIGNUP_FULL) {
