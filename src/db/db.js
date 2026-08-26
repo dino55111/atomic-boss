@@ -19,12 +19,20 @@ function migrateEventsTable(db) {
   }
 }
 
+function migrateRemindersColumn(db) {
+  const columns = db.prepare('PRAGMA table_info(events)').all().map((col) => col.name);
+  if (!columns.includes('reminded_at')) {
+    db.exec('ALTER TABLE events ADD COLUMN reminded_at TEXT');
+  }
+}
+
 function initDb(dbPath) {
   const db = new Database(dbPath);
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
   db.exec(schema);
   migrateSignupsTable(db);
   migrateEventsTable(db);
+  migrateRemindersColumn(db);
   return db;
 }
 
@@ -51,6 +59,14 @@ function updateEventMessageId(db, eventId, messageId) {
 
 function updateEventThreadId(db, eventId, threadId) {
   db.prepare('UPDATE events SET thread_id = ? WHERE id = ?').run(threadId, eventId);
+}
+
+function getEventsPendingReminder(db) {
+  return db.prepare('SELECT * FROM events WHERE reminded_at IS NULL ORDER BY id ASC').all();
+}
+
+function markEventReminded(db, eventId, remindedAt) {
+  db.prepare('UPDATE events SET reminded_at = ? WHERE id = ?').run(remindedAt, eventId);
 }
 
 function getSignups(db, eventId) {
@@ -131,11 +147,14 @@ module.exports = {
   initDb,
   migrateSignupsTable,
   migrateEventsTable,
+  migrateRemindersColumn,
   createEvent,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
+  getEventsPendingReminder,
+  markEventReminded,
   getSignups,
   countSignups,
   hasSignedUp,

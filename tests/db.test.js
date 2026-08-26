@@ -3,11 +3,14 @@ const {
   initDb,
   migrateSignupsTable,
   migrateEventsTable,
+  migrateRemindersColumn,
   createEvent,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
+  getEventsPendingReminder,
+  markEventReminded,
   getSignups,
   countSignups,
   hasSignedUp,
@@ -279,5 +282,58 @@ describe('db', () => {
   test('migrateEventsTable is a no-op when the column already exists', () => {
     const db = makeTestDb();
     expect(() => migrateEventsTable(db)).not.toThrow();
+  });
+
+  test('getEventsPendingReminder returns only events without a reminded_at', () => {
+    const db = makeTestDb();
+    const remindedEvent = makeTestEvent(db, { messageId: 'message-1' });
+    const pendingEvent = makeTestEvent(db, { messageId: 'message-2' });
+    markEventReminded(db, remindedEvent.id, '2026-07-12T19:00:00.000Z');
+
+    const pending = getEventsPendingReminder(db);
+    expect(pending.map((e) => e.id)).toEqual([pendingEvent.id]);
+  });
+
+  test('markEventReminded stores the reminded_at timestamp', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    markEventReminded(db, event.id, '2026-07-12T19:00:00.000Z');
+
+    expect(getEventById(db, event.id).reminded_at).toBe('2026-07-12T19:00:00.000Z');
+  });
+
+  test('a freshly created event has a null reminded_at', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(event.reminded_at).toBeNull();
+  });
+
+  test('migrateRemindersColumn adds the reminded_at column to an older events table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id      TEXT NOT NULL,
+        channel_id    TEXT NOT NULL,
+        message_id    TEXT NOT NULL,
+        thread_id     TEXT,
+        title         TEXT NOT NULL,
+        capacity      INTEGER NOT NULL,
+        session       INTEGER NOT NULL DEFAULT 1,
+        start_time    TEXT NOT NULL,
+        creator_id    TEXT NOT NULL,
+        created_at    TEXT NOT NULL
+      );
+    `);
+
+    migrateRemindersColumn(db);
+
+    const columns = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['reminded_at']));
+  });
+
+  test('migrateRemindersColumn is a no-op when the column already exists', () => {
+    const db = makeTestDb();
+    expect(() => migrateRemindersColumn(db)).not.toThrow();
   });
 });
