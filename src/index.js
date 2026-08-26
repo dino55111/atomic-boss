@@ -45,12 +45,20 @@ const handleInteraction = createInteractionHandler({
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
+let reminderPollInFlight = false;
+
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
   setInterval(() => {
-    checkAndSendReminders(client, db).catch((error) => {
-      console.error('Error checking event reminders:', error);
-    });
+    if (reminderPollInFlight) return;
+    reminderPollInFlight = true;
+    checkAndSendReminders(client, db)
+      .catch((error) => {
+        console.error('Error checking event reminders:', error);
+      })
+      .finally(() => {
+        reminderPollInFlight = false;
+      });
   }, REMINDER_POLL_INTERVAL_MS);
 });
 

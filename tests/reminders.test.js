@@ -15,7 +15,7 @@ describe('resolveEventStartDateTime', () => {
     expect(result.getMinutes()).toBe(0);
   });
 
-  test('rolls over to next year when the date is more than a day before the creation date', () => {
+  test('rolls over to next year when the date is well over 180 days before the creation date (Dec-created, Jan-session)', () => {
     const createdAt = new Date(2026, 11, 28, 0, 0); // 2026-12-28
     const event = { start_time: '1/5 20:00', created_at: createdAt.toISOString() };
 
@@ -24,6 +24,43 @@ describe('resolveEventStartDateTime', () => {
     expect(result.getFullYear()).toBe(2027);
     expect(result.getMonth()).toBe(0);
     expect(result.getDate()).toBe(5);
+  });
+
+  test('does not roll over when the event was created only a few days after its own start_time (real-world past/typo case)', () => {
+    const createdAt = new Date(2026, 7, 23, 0, 0); // 2026-08-23
+    const event = { start_time: '8/12 20:00', created_at: createdAt.toISOString() };
+
+    const result = resolveEventStartDateTime(event);
+
+    expect(result.getFullYear()).toBe(2026);
+    expect(result.getMonth()).toBe(7);
+    expect(result.getDate()).toBe(12);
+  });
+
+  test('does not roll over just under the 180-day threshold', () => {
+    const createdAt = new Date(2026, 11, 28, 0, 0); // 2026-12-28
+    const under180 = new Date(createdAt.getTime() - 179 * 24 * 60 * 60 * 1000);
+    const event = {
+      start_time: `${under180.getMonth() + 1}/${under180.getDate()} 20:00`,
+      created_at: createdAt.toISOString(),
+    };
+
+    const result = resolveEventStartDateTime(event);
+
+    expect(result.getFullYear()).toBe(2026);
+  });
+
+  test('rolls over to next year when the date is over the 180-day threshold', () => {
+    const createdAt = new Date(2026, 11, 28, 0, 0); // 2026-12-28
+    const over180 = new Date(createdAt.getTime() - 181 * 24 * 60 * 60 * 1000);
+    const event = {
+      start_time: `${over180.getMonth() + 1}/${over180.getDate()} 20:00`,
+      created_at: createdAt.toISOString(),
+    };
+
+    const result = resolveEventStartDateTime(event);
+
+    expect(result.getFullYear()).toBe(2027);
   });
 
   test('does not roll over when the date is only slightly before the creation time on the same day', () => {
