@@ -1,3 +1,5 @@
+const { getEventsPendingReminder, markEventReminded, getSignups } = require('./db/db');
+
 const START_TIME_PATTERN = /^(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2})$/;
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -25,4 +27,45 @@ function resolveEventStartDateTime(event) {
   return candidate;
 }
 
-module.exports = { resolveEventStartDateTime };
+const REMINDER_LEAD_MINUTES = 60;
+const REMINDER_POLL_INTERVAL_MS = 60 * 1000;
+
+function buildMentionSegment(signup) {
+  return signup.is_external ? `**${signup.display_name}**` : `<@${signup.user_id}>`;
+}
+
+async function checkAndSendReminders(client, db, now = new Date()) {
+  const leadMs = REMINDER_LEAD_MINUTES * 60 * 1000;
+  const pendingEvents = getEventsPendingReminder(db);
+
+  for (const event of pendingEvents) {
+    try {
+      const startAt = resolveEventStartDateTime(event);
+      const msUntilStart = startAt.getTime() - now.getTime();
+
+      if (msUntilStart <= 0 || msUntilStart > leadMs) {
+        continue;
+      }
+
+      const signups = getSignups(db, event.id);
+      if (signups.length === 0) {
+        continue;
+      }
+
+      const mentions = signups.map(buildMentionSegment).join(' ');
+      const mentionableUserIds = signups.filter((s) => !s.is_external).map((s) => s.user_id);
+
+      const thread = await client.channels.fetch(event.thread_id);
+      await thread.send({
+        content: `⏰ 距離「${event.title}（${event.session}場）」開始還有 ${REMINDER_LEAD_MINUTES} 分鐘（${event.start_time}），已報名的人記得準時出席：${mentions}`,
+        allowedMentions: { users: mentionableUserIds },
+      });
+
+      markEventReminded(db, event.id, now.toISOString());
+    } catch (error) {
+      console.error(`Failed to send reminder for event ${event.id}:`, error);
+    }
+  }
+}
+
+module.exports = { resolveEventStartDateTime, checkAndSendReminders, REMINDER_LEAD_MINUTES, REMINDER_POLL_INTERVAL_MS };

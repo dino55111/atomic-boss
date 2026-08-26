@@ -1,4 +1,5 @@
-const { resolveEventStartDateTime } = require('../src/reminders');
+const { resolveEventStartDateTime, checkAndSendReminders, REMINDER_LEAD_MINUTES } = require('../src/reminders');
+const { initDb, createEvent, updateEventThreadId, addSignup, getEventById, markEventReminded } = require('../src/db/db');
 
 describe('resolveEventStartDateTime', () => {
   test('resolves a same-year date to the year the event was created in', () => {
@@ -47,5 +48,162 @@ describe('resolveEventStartDateTime', () => {
     expect(result.getFullYear()).toBe(2026);
     expect(result.getMonth()).toBe(6);
     expect(result.getDate()).toBe(12);
+  });
+});
+
+describe('checkAndSendReminders', () => {
+  function makeDueEvent(db, overrides = {}) {
+    const createdAt = new Date(2026, 6, 1, 0, 0); // 2026-07-01, well before the 7/12 session
+    const event = createEvent(db, {
+      guildId: 'guild-1',
+      channelId: 'channel-1',
+      messageId: 'message-1',
+      title: '週三夜間團',
+      capacity: 5,
+      session: 1,
+      startTime: '7/12 20:00',
+      creatorId: 'creator-1',
+      ...overrides,
+    });
+    db.prepare('UPDATE events SET created_at = ? WHERE id = ?').run(createdAt.toISOString(), event.id);
+    updateEventThreadId(db, event.id, overrides.threadId ?? 'thread-1');
+    return getEventById(db, event.id);
+  }
+
+  test('sends a reminder and marks reminded_at when within the 60-minute window and someone signed up', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    const now = new Date(2026, 6, 12, 19, 30); // 30 minutes before the 20:00 start
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(client.channels.fetch).toHaveBeenCalledWith('thread-1');
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('週三夜間團（1場）'),
+      allowedMentions: { users: ['user-1'] },
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining(`${REMINDER_LEAD_MINUTES} 分鐘`),
+    }));
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-1>'),
+    }));
+    expect(getEventById(db, event.id).reminded_at).toBe(now.toISOString());
+  });
+
+  test('renders an external signup with a bold name instead of a mention', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1', isExternal: true,
+    });
+    const now = new Date(2026, 6, 12, 19, 30);
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('**小明**'),
+      allowedMentions: { users: [] },
+    }));
+  });
+
+  test('does not send when more than 60 minutes remain before the start', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    const now = new Date(2026, 6, 12, 18, 0); // 2 hours before the 20:00 start
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).not.toHaveBeenCalled();
+    expect(getEventById(db, event.id).reminded_at).toBeNull();
+  });
+
+  test('does not send again once reminded_at is already set', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    markEventReminded(db, event.id, '2026-07-12T19:00:00.000Z');
+    const now = new Date(2026, 6, 12, 19, 30);
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).not.toHaveBeenCalled();
+  });
+
+  test('skips and does not mark reminded_at when there are no signups yet', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    const now = new Date(2026, 6, 12, 19, 30);
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).not.toHaveBeenCalled();
+    expect(getEventById(db, event.id).reminded_at).toBeNull();
+  });
+
+  test('still sends (catch-up) when now is later than the ideal reminder time but the event has not started', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    const now = new Date(2026, 6, 12, 19, 59); // 1 minute before start — long past the ideal 60-minute mark
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).toHaveBeenCalledTimes(1);
+    expect(getEventById(db, event.id).reminded_at).toBe(now.toISOString());
+  });
+
+  test('does not send once the event has already started', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    const now = new Date(2026, 6, 12, 20, 1); // 1 minute after the 20:00 start
+    const thread = { send: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async () => thread) } };
+
+    await checkAndSendReminders(client, db, now);
+
+    expect(thread.send).not.toHaveBeenCalled();
+    expect(getEventById(db, event.id).reminded_at).toBeNull();
+  });
+
+  test('isolates a failure sending one reminder from other due events in the same poll', async () => {
+    const db = initDb(':memory:');
+    const failingEvent = makeDueEvent(db, { messageId: 'message-1', threadId: 'thread-bad' });
+    const okEvent = makeDueEvent(db, { messageId: 'message-2', threadId: 'thread-good' });
+    addSignup(db, failingEvent, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+    addSignup(db, okEvent, { userId: 'user-2', displayName: 'Bob', className: '法師', level: '65', gameId: 'b#1' });
+    const now = new Date(2026, 6, 12, 19, 30);
+    const okThread = { send: jest.fn(async () => {}) };
+    const client = {
+      channels: {
+        fetch: jest.fn(async (threadId) => {
+          if (threadId === 'thread-bad') throw new Error('Unknown Channel');
+          return okThread;
+        }),
+      },
+    };
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(checkAndSendReminders(client, db, now)).resolves.toBeUndefined();
+
+    expect(okThread.send).toHaveBeenCalledTimes(1);
+    expect(getEventById(db, okEvent.id).reminded_at).toBe(now.toISOString());
+    expect(getEventById(db, failingEvent.id).reminded_at).toBeNull();
+    consoleErrorSpy.mockRestore();
   });
 });
