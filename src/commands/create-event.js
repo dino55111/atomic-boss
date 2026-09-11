@@ -34,6 +34,11 @@ function buildTitleButtonRow() {
 }
 
 async function execute(interaction) {
+  if (interaction.channel.isThread()) {
+    await interaction.reply({ content: '討論串裡不能開新的揪團，請到原本的頻道使用 /boss', ephemeral: true });
+    return;
+  }
+
   await interaction.reply({
     content: '請選擇標題：',
     components: [buildTitleButtonRow()],

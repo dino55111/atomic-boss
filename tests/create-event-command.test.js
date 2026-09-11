@@ -6,7 +6,7 @@ describe('create-event command', () => {
   });
 
   test('execute replies with an ephemeral title-picker message', async () => {
-    const interaction = { reply: jest.fn(async () => {}) };
+    const interaction = { reply: jest.fn(async () => {}), channel: { isThread: () => false } };
     await execute(interaction);
 
     expect(interaction.reply).toHaveBeenCalledTimes(1);
@@ -14,6 +14,16 @@ describe('create-event command', () => {
     expect(replyPayload.ephemeral).toBe(true);
     expect(replyPayload.components).toHaveLength(1);
     expect(replyPayload.components[0].components).toHaveLength(TITLE_OPTIONS.length);
+  });
+
+  test('execute refuses to start inside a thread and does not show the title-picker', async () => {
+    const interaction = { reply: jest.fn(async () => {}), channel: { isThread: () => true } };
+    await execute(interaction);
+
+    expect(interaction.reply).toHaveBeenCalledTimes(1);
+    const replyPayload = interaction.reply.mock.calls[0][0];
+    expect(replyPayload.ephemeral).toBe(true);
+    expect(replyPayload.components).toBeUndefined();
   });
 });
 
