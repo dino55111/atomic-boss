@@ -1,0 +1,21 @@
+# Fly.io config for a long-running background worker (no HTTP port to
+# expose — the bot only holds a Discord gateway connection), backed by a
+# persistent volume so data.db survives redeploys and restarts.
+#
+# `app` must be globally unique across all of Fly — rename it before your
+# first `fly apps create` if this one is taken.
+app = "atomic-boss"
+primary_region = "nrt"
+
+[build]
+
+[env]
+  DB_PATH = "/data/data.db"
+
+[mounts]
+  source = "atomic_boss_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

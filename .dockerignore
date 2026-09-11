@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.example
+data.db
+*.db
+tests
+docs
+.worktrees
+.superpowers
+.claude
+README.md
