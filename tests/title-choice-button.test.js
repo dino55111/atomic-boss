@@ -7,13 +7,75 @@ const {
 } = require('../src/interactions/title-choice-button');
 
 describe('buildCreateEventModal', () => {
-  test('customId embeds the chosen title and session, title mentions the title, and has only the 時間 field', () => {
-    const modal = buildCreateEventModal('普拉', 3);
+  const now = new Date(2026, 8, 5); // Sat 2026-09-05
+
+  test('customId embeds the chosen title and session, and title mentions the title', () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
     expect(modal.data.custom_id).toBe('create-event-modal:普拉:3');
     expect(modal.data.title).toBe('建立揪團（普拉）');
-    expect(modal.components).toHaveLength(1);
-    expect(modal.components[0].components[0].data.label).toBe('時間');
-    expect(modal.components[0].components[0].data.custom_id).toBe('start_time');
+  });
+
+  test('has three label components wrapping the date, hour, and minute selects', () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
+    expect(modal.components).toHaveLength(3);
+    expect(modal.components.map((label) => label.data.label)).toEqual(['日期', '時', '分']);
+    expect(modal.components.map((label) => label.data.component.data.custom_id)).toEqual([
+      'event_date',
+      'event_hour',
+      'event_minute',
+    ]);
+  });
+
+  test('date select offers the next 7 days starting today, each labeled with its weekday', () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
+    const dateSelect = modal.components[0].data.component;
+
+    expect(dateSelect.options.map((option) => option.data.value)).toEqual([
+      '9/5',
+      '9/6',
+      '9/7',
+      '9/8',
+      '9/9',
+      '9/10',
+      '9/11',
+    ]);
+    expect(dateSelect.options.map((option) => option.data.label)).toEqual([
+      '9/5 (六)（今天）',
+      '9/6 (日)',
+      '9/7 (一)',
+      '9/8 (二)',
+      '9/9 (三)',
+      '9/10 (四)',
+      '9/11 (五)',
+    ]);
+  });
+
+  test("today's date option is selected by default and no other date option is", () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
+    const [today, ...rest] = modal.components[0].data.component.options;
+
+    expect(today.data.default).toBe(true);
+    expect(rest.every((option) => !option.data.default)).toBe(true);
+  });
+
+  test('hour select offers 00~23 with 20 selected by default', () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
+    const hourSelect = modal.components[1].data.component;
+
+    expect(hourSelect.options.map((option) => option.data.value)).toEqual(
+      Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')),
+    );
+    expect(hourSelect.options.find((option) => option.data.value === '20').data.default).toBe(true);
+    expect(hourSelect.options.filter((option) => option.data.default)).toHaveLength(1);
+  });
+
+  test('minute select offers every 10 minutes with 00 selected by default', () => {
+    const modal = buildCreateEventModal('普拉', 3, now);
+    const minuteSelect = modal.components[2].data.component;
+
+    expect(minuteSelect.options.map((option) => option.data.value)).toEqual(['00', '10', '20', '30', '40', '50']);
+    expect(minuteSelect.options[0].data.default).toBe(true);
+    expect(minuteSelect.options.filter((option) => option.data.default)).toHaveLength(1);
   });
 });
 
@@ -27,7 +89,7 @@ describe('buildSessionButtonRow', () => {
 
     const labels = rows.flatMap((row) => row.components.map((button) => button.data.label));
     const customIds = rows.flatMap((row) => row.components.map((button) => button.data.custom_id));
-    expect(labels).toEqual(['第1場', '第2場', '第3場', '第4場', '第5場', '第6場', '第7場']);
+    expect(labels).toEqual(['1場', '2場', '3場', '4場', '5場', '6場', '7場']);
     expect(customIds).toEqual(SESSION_OPTIONS.map((session) => `session-choice:普拉:${session}`));
   });
 });

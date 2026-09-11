@@ -22,7 +22,10 @@ function isValidStartTime(rawStartTime) {
 async function handleCreateEventModal(interaction, db) {
   const [, title, sessionRaw] = interaction.customId.split(':');
   const session = Number.parseInt(sessionRaw, 10);
-  const startTime = interaction.fields.getTextInputValue('start_time');
+  const date = interaction.fields.getStringSelectValues('event_date')[0];
+  const hour = interaction.fields.getStringSelectValues('event_hour')[0];
+  const minute = interaction.fields.getStringSelectValues('event_minute')[0];
+  const startTime = `${date} ${hour}:${minute}`;
   const capacity = TITLE_CAPACITIES[title];
 
   // If the ack fails (stale interaction), we can no longer message the user
@@ -34,7 +37,7 @@ async function handleCreateEventModal(interaction, db) {
   if (!isValidStartTime(startTime)) {
     if (acked) {
       await interaction.followUp({
-        content: '時間格式錯誤，請用「月/日 時:分」的格式重新使用 /揪團 建立，例如 7/12 20:00',
+        content: '時間格式錯誤，請用「月/日 時:分」的格式重新使用 /boss 建立，例如 7/12 20:00',
         ephemeral: true,
       });
     }
@@ -58,7 +61,7 @@ async function handleCreateEventModal(interaction, db) {
   const message = await interaction.channel.send({ embeds: [embed], components: [row] });
   updateEventMessageId(db, event.id, message.id);
 
-  const thread = await message.startThread({ name: `${startTime} ${title} 第${session}場`.slice(0, 100) });
+  const thread = await message.startThread({ name: `${startTime} ${title} ${session}場`.slice(0, 100) });
   updateEventThreadId(db, event.id, thread.id);
 }
 

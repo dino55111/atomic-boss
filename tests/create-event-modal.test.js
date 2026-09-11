@@ -1,14 +1,15 @@
 const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
-function makeInteraction({ title, session = 1, startTime, deferUpdateFails = false }) {
+function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minute = '00', deferUpdateFails = false }) {
   const startThread = jest.fn(async () => ({ id: 'thread-1' }));
+  const selectValues = { event_date: date, event_hour: hour, event_minute: minute };
   return {
     customId: `create-event-modal:${title}:${session}`,
     guildId: 'guild-1',
     channelId: 'channel-1',
     user: { id: 'creator-1' },
-    fields: { getTextInputValue: () => startTime },
+    fields: { getStringSelectValues: (customId) => [selectValues[customId]] },
     deferUpdate: jest.fn(async () => {
       if (deferUpdateFails) {
         throw new Error('Unknown interaction');
@@ -48,7 +49,7 @@ describe('isValidStartTime', () => {
 describe('handleCreateEventModal', () => {
   test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed to the channel', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉' });
 
     await handleCreateEventModal(interaction, db);
 
@@ -63,18 +64,28 @@ describe('handleCreateEventModal', () => {
     expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
-  test('thread name is prefixed with the full 時間 and suffixed with the chosen session', async () => {
+  test('thread name is prefixed with the composed 日期 時:分 and suffixed with the chosen session', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', session: 3, startTime: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', session: 3, date: '7/12', hour: '20', minute: '00' });
 
     await handleCreateEventModal(interaction, db);
 
-    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 20:00 普拉 第3場' });
+    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 20:00 普拉 3場' });
+  });
+
+  test('composes the start time from the date, hour, and minute selects', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉', date: '9/6', hour: '21', minute: '30' });
+
+    await handleCreateEventModal(interaction, db);
+
+    const event = getEventById(db, 1);
+    expect(event.start_time).toBe('9/6 21:30');
   });
 
   test('stores the chosen session number on the event', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', session: 5, startTime: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '普拉', session: 5 });
 
     await handleCreateEventModal(interaction, db);
 
@@ -84,7 +95,7 @@ describe('handleCreateEventModal', () => {
 
   test('龍王 gets a capacity of 12', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '龍王', startTime: '7/12 20:00' });
+    const interaction = makeInteraction({ title: '龍王' });
 
     await handleCreateEventModal(interaction, db);
 
@@ -92,21 +103,9 @@ describe('handleCreateEventModal', () => {
     expect(event.capacity).toBe(12);
   });
 
-  test('replies with a follow-up error and does not create an event when the time format is invalid', async () => {
-    const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', startTime: '晚上八點' });
-
-    await handleCreateEventModal(interaction, db);
-
-    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
-    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
-    expect(getEventById(db, 1)).toBeUndefined();
-  });
-
   test('still creates the event and posts the embed when the interaction ack fails (stale interaction)', async () => {
     const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', startTime: '7/12 20:00', deferUpdateFails: true });
+    const interaction = makeInteraction({ title: '普拉', deferUpdateFails: true });
 
     await handleCreateEventModal(interaction, db);
 
