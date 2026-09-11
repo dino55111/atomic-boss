@@ -165,6 +165,30 @@ describe('handleAssistJoinModal', () => {
     }));
   });
 
+  test('does not list a user id twice in allowedMentions when assisting your own signup', async () => {
+    // Same underlying bug as signup-button.js: Discord's real API rejects
+    // allowed_mentions.users with a duplicate id (code 50035). If a helper
+    // picks themselves as the assist target, target user id and helper id
+    // are the same, so the array must be deduped.
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:helper-1:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'Helper' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    const { allowedMentions } = thread.send.mock.calls[0][0];
+    expect(allowedMentions.users).toEqual(['helper-1']);
+  });
+
   test('falls back to the raw user id as display name when fetching the user fails', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db);

@@ -189,7 +189,9 @@ async function handleAssistJoinModal(interaction, db) {
   const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
   const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);
-  const mentionableUserIds = isExternal ? [interaction.user.id] : [userId, interaction.user.id];
+  // Discord rejects allowed_mentions.users containing a duplicate id, which
+  // happens if a helper picks themselves as the assist target.
+  const mentionableUserIds = isExternal ? [interaction.user.id] : [...new Set([userId, interaction.user.id])];
   await thread.send({
     content: `${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`,
     allowedMentions: { users: mentionableUserIds },
