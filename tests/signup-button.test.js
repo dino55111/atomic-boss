@@ -8,6 +8,7 @@ const {
   handleCancelButton,
   handleCancelSelectButton,
   CLASS_OPTIONS,
+  CLASS_EMOJIS,
 } = require('../src/interactions/signup-button');
 
 function makeEvent(db, overrides = {}) {
@@ -28,9 +29,24 @@ describe('buildClassButtonRows', () => {
     const rows = buildClassButtonRows(42);
     expect(rows).toHaveLength(3);
     expect(rows.every((row) => row.components.length === 4)).toBe(true);
+  });
 
-    const labels = rows.flatMap((row) => row.components.map((button) => button.data.label));
-    expect(labels).toEqual(CLASS_OPTIONS);
+  test('prefixes each unicode-emoji class label with its emoji, but keeps the customId as the plain class name', () => {
+    const rows = buildClassButtonRows(42);
+    const buttons = rows.flatMap((row) => row.components);
+    CLASS_OPTIONS.forEach((className, index) => {
+      const emoji = CLASS_EMOJIS[className];
+      if (typeof emoji !== 'string') return;
+      expect(buttons[index].data.label).toBe(`${emoji} ${className}`);
+    });
+  });
+
+  test('uses a custom server emoji icon for 夜使者 instead of prefixing the label', () => {
+    const rows = buildClassButtonRows(42);
+    const buttons = rows.flatMap((row) => row.components);
+    const button = buttons[CLASS_OPTIONS.indexOf('夜使者')];
+    expect(button.data.label).toBe('夜使者');
+    expect(button.data.emoji).toEqual(CLASS_EMOJIS['夜使者']);
   });
 
   test('each button customId embeds the event id and its own class', () => {
@@ -100,7 +116,7 @@ describe('handleCancelButton', () => {
     addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
 
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const thread = { send: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
@@ -119,6 +135,52 @@ describe('handleCancelButton', () => {
     expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
   });
 
+  test('removes the cancelled user from the discussion thread', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(thread.members.remove).toHaveBeenCalledWith('user-1');
+  });
+
+  test('still finishes the cancellation when removing the thread member fails (e.g. missing permission)', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = {
+      send: jest.fn(async () => {}),
+      members: { remove: jest.fn(async () => { throw new Error('Missing Permissions'); }) },
+    };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
+    expect(getSignups(db, event.id)).toHaveLength(0);
+  });
+
   test('scopes allowedMentions to prevent unparsed mention syntax in display_name from pinging', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db);
@@ -126,7 +188,7 @@ describe('handleCancelButton', () => {
     addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
 
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const thread = { send: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
@@ -140,6 +202,31 @@ describe('handleCancelButton', () => {
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
       allowedMentions: { users: expect.arrayContaining(['user-1']) },
     }));
+  });
+
+  test('does not list a user id twice in allowedMentions when cancelling your own signup', async () => {
+    // Discord's real API rejects allowed_mentions.users with a duplicate id
+    // ("Invalid Form Body", code 50035). signup.user_id and interaction.user.id
+    // are the same person here, so the array must be deduped.
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await handleCancelButton(interaction, db);
+
+    const { allowedMentions } = thread.send.mock.calls[0][0];
+    expect(allowedMentions.users).toEqual(['user-1']);
   });
 
   test('silently acknowledges without any message when the user never signed up', async () => {
@@ -204,7 +291,7 @@ describe('handleCancelButton', () => {
     });
 
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const thread = { send: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'user-9' },
@@ -257,7 +344,7 @@ describe('handleCancelButton with multiple cancellable signups', () => {
     });
 
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const thread = { send: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
     const interaction = {
       customId: `cancel:${event.id}`,
       user: { id: 'creator-1' },
@@ -275,6 +362,7 @@ describe('handleCancelButton with multiple cancellable signups', () => {
       content: expect.stringContaining('由 <@creator-1> 代為取消'),
     }));
     expect(getSignups(db, event.id)).toHaveLength(0);
+    expect(thread.members.remove).not.toHaveBeenCalled();
   });
 });
 
@@ -290,7 +378,7 @@ describe('handleCancelSelectButton', () => {
     const [signup] = getSignups(db, event.id);
 
     const editedMessage = { edit: jest.fn(async () => {}) };
-    const thread = { send: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
     const interaction = {
       customId: `cancel-select:${event.id}:${signup.id}`,
       user: { id: 'helper-1' },
@@ -303,6 +391,7 @@ describe('handleCancelSelectButton', () => {
 
     expect(getSignups(db, event.id)).toHaveLength(0);
     expect(interaction.update).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
+    expect(thread.members.remove).not.toHaveBeenCalled();
   });
 
   test('gracefully updates the message when the signup was already removed', async () => {

@@ -19,15 +19,37 @@ const CLASS_OPTIONS = [
   '夜使者', '黑騎士', '聖騎士', '英雄', '槍神', '拳霸',
 ];
 
+const CLASS_EMOJIS = {
+  冰雷: '❄️',
+  火毒: '🔥',
+  主教: '✝️',
+  箭神: '🏹',
+  神射手: '🎯',
+  暗影神偷: '🥷',
+  夜使者: { id: '1373765572973826068', name: '2070006' },
+  黑騎士: '⚔️',
+  聖騎士: '🛡️',
+  英雄: '🦸',
+  槍神: '🔱',
+  拳霸: '👊',
+};
+
 const CLASS_BUTTONS_PER_ROW = 4;
 
 function buildClassButtonRowsForCustomIds(customIdForClass) {
-  const buttons = CLASS_OPTIONS.map((className) =>
-    new ButtonBuilder()
+  const buttons = CLASS_OPTIONS.map((className) => {
+    const emoji = CLASS_EMOJIS[className];
+    const button = new ButtonBuilder()
       .setCustomId(customIdForClass(className))
-      .setLabel(className)
-      .setStyle(ButtonStyle.Secondary),
-  );
+      .setStyle(ButtonStyle.Secondary);
+
+    // A unicode emoji is prefixed straight into the label; a custom server
+    // emoji ({ id, name }) can't be embedded in label text, so it's set as
+    // the button's icon instead and the label stays plain.
+    return typeof emoji === 'string'
+      ? button.setLabel(`${emoji} ${className}`)
+      : button.setEmoji(emoji).setLabel(className);
+  });
 
   const rows = [];
   for (let i = 0; i < buttons.length; i += CLASS_BUTTONS_PER_ROW) {
@@ -133,10 +155,22 @@ async function applyCancellation(interaction, db, event, signup) {
   const nameSegment = signup.is_external ? `**${signup.display_name}**` : `<@${signup.user_id}>`;
   const assistSegment = interaction.user.id === signup.user_id ? '' : `（由 <@${interaction.user.id}> 代為取消）`;
   const thread = await interaction.client.channels.fetch(event.thread_id);
+  // Discord rejects allowed_mentions.users containing a duplicate id, which
+  // happens whenever the canceller is cancelling their own signup.
+  const mentionableUserIds = [...new Set([signup.user_id, interaction.user.id])];
   await thread.send({
     content: `${nameSegment} 已取消報名${assistSegment}`,
-    allowedMentions: { users: [signup.user_id, interaction.user.id] },
+    allowedMentions: { users: mentionableUserIds },
   });
+
+  // The cancellation message above still @mentions the user, which Discord
+  // treats as (re-)joining them to the thread, so the removal must happen
+  // after the send, not before. External signups have no real Discord user
+  // to remove. Best-effort: a missing permission or an already-archived
+  // thread shouldn't block the cancellation itself.
+  if (!signup.is_external) {
+    await thread.members.remove(signup.user_id).catch(() => {});
+  }
 }
 
 async function handleCancelButton(interaction, db) {
@@ -194,4 +228,5 @@ module.exports = {
   handleCancelButton,
   handleCancelSelectButton,
   CLASS_OPTIONS,
+  CLASS_EMOJIS,
 };
