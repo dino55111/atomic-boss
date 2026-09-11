@@ -1,12 +1,18 @@
 const { buildEventEmbed, buildActionRow } = require('../src/embeds/event-embed');
 
-const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00' };
+const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
 
 describe('buildEventEmbed', () => {
+  test('shows who opened the event', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    const creatorField = embed.data.fields.find((f) => f.name === '開團主');
+    expect(creatorField.value).toBe('<@creator-1>');
+  });
+
   test('shows the session field', () => {
     const embed = buildEventEmbed(baseEvent, []);
     const sessionField = embed.data.fields.find((f) => f.name === '場次');
-    expect(sessionField.value).toBe('第3場');
+    expect(sessionField.value).toBe('3場');
   });
 
   test('shows placeholder text when there are no signups', () => {
