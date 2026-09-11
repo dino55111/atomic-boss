@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS events (
   start_time    TEXT NOT NULL,
   creator_id    TEXT NOT NULL,
   created_at    TEXT NOT NULL,
-  reminded_at   TEXT
+  reminded_at   TEXT,
+  cleaned_at    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS signups (

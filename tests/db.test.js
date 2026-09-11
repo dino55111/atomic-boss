@@ -4,6 +4,7 @@ const {
   migrateSignupsTable,
   migrateEventsTable,
   migrateRemindersColumn,
+  migrateCleanupColumn,
   createEvent,
   getEventById,
   getEventByMessageId,
@@ -11,6 +12,8 @@ const {
   updateEventThreadId,
   getEventsPendingReminder,
   markEventReminded,
+  getEventsPendingCleanup,
+  markEventCleaned,
   getSignups,
   countSignups,
   hasSignedUp,
@@ -335,5 +338,59 @@ describe('db', () => {
   test('migrateRemindersColumn is a no-op when the column already exists', () => {
     const db = makeTestDb();
     expect(() => migrateRemindersColumn(db)).not.toThrow();
+  });
+
+  test('getEventsPendingCleanup returns only events without a cleaned_at', () => {
+    const db = makeTestDb();
+    const cleanedEvent = makeTestEvent(db, { messageId: 'message-1' });
+    const pendingEvent = makeTestEvent(db, { messageId: 'message-2' });
+    markEventCleaned(db, cleanedEvent.id, '2026-07-12T22:00:00.000Z');
+
+    const pending = getEventsPendingCleanup(db);
+    expect(pending.map((e) => e.id)).toEqual([pendingEvent.id]);
+  });
+
+  test('markEventCleaned stores the cleaned_at timestamp', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    markEventCleaned(db, event.id, '2026-07-12T22:00:00.000Z');
+
+    expect(getEventById(db, event.id).cleaned_at).toBe('2026-07-12T22:00:00.000Z');
+  });
+
+  test('a freshly created event has a null cleaned_at', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(event.cleaned_at).toBeNull();
+  });
+
+  test('migrateCleanupColumn adds the cleaned_at column to an older events table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id      TEXT NOT NULL,
+        channel_id    TEXT NOT NULL,
+        message_id    TEXT NOT NULL,
+        thread_id     TEXT,
+        title         TEXT NOT NULL,
+        capacity      INTEGER NOT NULL,
+        session       INTEGER NOT NULL DEFAULT 1,
+        start_time    TEXT NOT NULL,
+        creator_id    TEXT NOT NULL,
+        created_at    TEXT NOT NULL,
+        reminded_at   TEXT
+      );
+    `);
+
+    migrateCleanupColumn(db);
+
+    const columns = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['cleaned_at']));
+  });
+
+  test('migrateCleanupColumn is a no-op when the column already exists', () => {
+    const db = makeTestDb();
+    expect(() => migrateCleanupColumn(db)).not.toThrow();
   });
 });

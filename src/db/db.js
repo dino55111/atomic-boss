@@ -26,6 +26,13 @@ function migrateRemindersColumn(db) {
   }
 }
 
+function migrateCleanupColumn(db) {
+  const columns = db.prepare('PRAGMA table_info(events)').all().map((col) => col.name);
+  if (!columns.includes('cleaned_at')) {
+    db.exec('ALTER TABLE events ADD COLUMN cleaned_at TEXT');
+  }
+}
+
 function initDb(dbPath) {
   const db = new Database(dbPath);
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
@@ -33,6 +40,7 @@ function initDb(dbPath) {
   migrateSignupsTable(db);
   migrateEventsTable(db);
   migrateRemindersColumn(db);
+  migrateCleanupColumn(db);
   return db;
 }
 
@@ -67,6 +75,14 @@ function getEventsPendingReminder(db) {
 
 function markEventReminded(db, eventId, remindedAt) {
   db.prepare('UPDATE events SET reminded_at = ? WHERE id = ?').run(remindedAt, eventId);
+}
+
+function getEventsPendingCleanup(db) {
+  return db.prepare('SELECT * FROM events WHERE cleaned_at IS NULL ORDER BY id ASC').all();
+}
+
+function markEventCleaned(db, eventId, cleanedAt) {
+  db.prepare('UPDATE events SET cleaned_at = ? WHERE id = ?').run(cleanedAt, eventId);
 }
 
 function getSignups(db, eventId) {
@@ -148,6 +164,7 @@ module.exports = {
   migrateSignupsTable,
   migrateEventsTable,
   migrateRemindersColumn,
+  migrateCleanupColumn,
   createEvent,
   getEventById,
   getEventByMessageId,
@@ -155,6 +172,8 @@ module.exports = {
   updateEventThreadId,
   getEventsPendingReminder,
   markEventReminded,
+  getEventsPendingCleanup,
+  markEventCleaned,
   getSignups,
   countSignups,
   hasSignedUp,

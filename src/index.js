@@ -21,8 +21,12 @@ const {
 } = require('./interactions/assist-signup');
 const { createInteractionHandler } = require('./interaction-router');
 const { checkAndSendReminders, REMINDER_POLL_INTERVAL_MS } = require('./reminders');
+const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup');
 
-const db = initDb(path.join(__dirname, '..', 'data.db'));
+// DB_PATH lets a deployment point the SQLite file at a mounted persistent
+// volume (e.g. Fly.io's /data) instead of the repo-relative default used
+// for local development.
+const db = initDb(process.env.DB_PATH || path.join(__dirname, '..', 'data.db'));
 const commands = new Map([[createEventCommand.data.name, createEventCommand]]);
 
 const handleInteraction = createInteractionHandler({
@@ -46,6 +50,7 @@ const handleInteraction = createInteractionHandler({
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 let reminderPollInFlight = false;
+let cleanupPollInFlight = false;
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`Logged in as ${readyClient.user.tag}`);
@@ -60,6 +65,17 @@ client.once(Events.ClientReady, (readyClient) => {
         reminderPollInFlight = false;
       });
   }, REMINDER_POLL_INTERVAL_MS);
+  setInterval(() => {
+    if (cleanupPollInFlight) return;
+    cleanupPollInFlight = true;
+    checkAndCleanupEvents(client, db)
+      .catch((error) => {
+        console.error('Error cleaning up finished events:', error);
+      })
+      .finally(() => {
+        cleanupPollInFlight = false;
+      });
+  }, CLEANUP_POLL_INTERVAL_MS);
 });
 
 client.on(Events.InteractionCreate, (interaction) => {
