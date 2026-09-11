@@ -10,15 +10,23 @@ const TITLE_CAPACITIES = {
 
 const TITLE_OPTIONS = Object.keys(TITLE_CAPACITIES);
 
+const TITLE_EMOJIS = {
+  普拉: '⏰',
+  普炎: '🌋',
+  困拉: '⏰',
+  龍王: '🐉',
+  蝴蝶王: '🦋',
+};
+
 const data = new SlashCommandBuilder()
-  .setName('揪團')
+  .setName('boss')
   .setDescription('建立一個新的揪團報名');
 
 function buildTitleButtonRow() {
   const buttons = TITLE_OPTIONS.map((title) =>
     new ButtonBuilder()
       .setCustomId(`title-choice:${title}`)
-      .setLabel(title)
+      .setLabel(`${TITLE_EMOJIS[title]} ${title}`)
       .setStyle(ButtonStyle.Secondary),
   );
 
@@ -33,4 +41,4 @@ async function execute(interaction) {
   });
 }
 
-module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES };
+module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS };

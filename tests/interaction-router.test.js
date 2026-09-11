@@ -34,9 +34,9 @@ function makeHandlers(overrides = {}) {
 describe('createInteractionHandler', () => {
   test('routes chat input commands to the matching command handler', async () => {
     const execute = jest.fn(async () => {});
-    const commands = new Map([['揪團', { execute }]]);
+    const commands = new Map([['boss', { execute }]]);
     const handle = createInteractionHandler(makeHandlers({ commands }));
-    const interaction = makeBaseInteraction({ isChatInputCommand: () => true, commandName: '揪團' });
+    const interaction = makeBaseInteraction({ isChatInputCommand: () => true, commandName: 'boss' });
 
     await handle(interaction);
 

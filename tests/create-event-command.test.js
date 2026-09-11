@@ -1,8 +1,8 @@
-const { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES } = require('../src/commands/create-event');
+const { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS } = require('../src/commands/create-event');
 
 describe('create-event command', () => {
-  test('command name is 揪團', () => {
-    expect(data.name).toBe('揪團');
+  test('command name is boss', () => {
+    expect(data.name).toBe('boss');
   });
 
   test('execute replies with an ephemeral title-picker message', async () => {
@@ -20,10 +20,14 @@ describe('create-event command', () => {
 describe('buildTitleButtonRow', () => {
   test('lays out all title options as buttons with title-choice customIds', () => {
     const row = buildTitleButtonRow();
-    const labels = row.components.map((button) => button.data.label);
     const customIds = row.components.map((button) => button.data.custom_id);
-    expect(labels).toEqual(TITLE_OPTIONS);
     expect(customIds).toEqual(TITLE_OPTIONS.map((title) => `title-choice:${title}`));
+  });
+
+  test('prefixes each button label with its emoji, but keeps the customId as the plain title', () => {
+    const row = buildTitleButtonRow();
+    const labels = row.components.map((button) => button.data.label);
+    expect(labels).toEqual(TITLE_OPTIONS.map((title) => `${TITLE_EMOJIS[title]} ${title}`));
   });
 });
 
