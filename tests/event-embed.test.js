@@ -1,4 +1,5 @@
 const { buildEventEmbed, buildActionRow } = require('../src/embeds/event-embed');
+const { TITLE_NOTES } = require('../src/commands/create-event');
 
 const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
 
@@ -7,6 +8,19 @@ describe('buildEventEmbed', () => {
     const embed = buildEventEmbed(baseEvent, []);
     const creatorField = embed.data.fields.find((f) => f.name === '開團主');
     expect(creatorField.value).toBe('<@creator-1>');
+  });
+
+  test('shows the 注意事項 field with the matching title\'s notes', () => {
+    const event = { ...baseEvent, title: '普拉' };
+    const embed = buildEventEmbed(event, []);
+    const notesField = embed.data.fields.find((f) => f.name === '注意事項');
+    expect(notesField.value).toBe(TITLE_NOTES['普拉']);
+  });
+
+  test('omits the 注意事項 field for a title with no configured notes', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    const notesField = embed.data.fields.find((f) => f.name === '注意事項');
+    expect(notesField).toBeUndefined();
   });
 
   test('shows the session field', () => {

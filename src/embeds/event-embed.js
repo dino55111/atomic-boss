@@ -1,4 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { TITLE_NOTES } = require('../commands/create-event');
 
 function buildEventEmbed(event, signups) {
   const roster = signups.length === 0
@@ -12,15 +13,19 @@ function buildEventEmbed(event, signups) {
         })
         .join('\n');
 
+  const notes = TITLE_NOTES[event.title];
+  const fields = [
+    { name: '時間', value: event.start_time, inline: true },
+    { name: '場次', value: `${event.session}場`, inline: true },
+    { name: '人數', value: `${signups.length} / ${event.capacity}`, inline: true },
+    { name: '開團主', value: `<@${event.creator_id}>`, inline: true },
+    ...(notes ? [{ name: '注意事項', value: notes }] : []),
+    { name: '名單', value: roster },
+  ];
+
   return new EmbedBuilder()
     .setTitle(event.title)
-    .addFields(
-      { name: '時間', value: event.start_time, inline: true },
-      { name: '場次', value: `${event.session}場`, inline: true },
-      { name: '人數', value: `${signups.length} / ${event.capacity}`, inline: true },
-      { name: '開團主', value: `<@${event.creator_id}>`, inline: true },
-      { name: '名單', value: roster },
-    )
+    .addFields(fields)
     .setColor(signups.length >= event.capacity ? 0xe74c3c : 0x2ecc71);
 }
 

@@ -1,4 +1,12 @@
-const { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS } = require('../src/commands/create-event');
+const {
+  data,
+  execute,
+  buildTitleButtonRow,
+  TITLE_OPTIONS,
+  TITLE_CAPACITIES,
+  TITLE_EMOJIS,
+  TITLE_NOTES,
+} = require('../src/commands/create-event');
 
 describe('create-event command', () => {
   test('command name is boss', () => {
@@ -52,5 +60,14 @@ describe('TITLE_CAPACITIES', () => {
 
   test('has an entry for every title option', () => {
     expect(Object.keys(TITLE_CAPACITIES).sort()).toEqual([...TITLE_OPTIONS].sort());
+  });
+});
+
+describe('TITLE_NOTES', () => {
+  test('has a non-empty entry for every title option', () => {
+    for (const title of TITLE_OPTIONS) {
+      expect(typeof TITLE_NOTES[title]).toBe('string');
+      expect(TITLE_NOTES[title].length).toBeGreaterThan(0);
+    }
   });
 });
