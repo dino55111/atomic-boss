@@ -6,6 +6,7 @@ const {
   migrateRemindersColumn,
   migrateCleanupColumn,
   createEvent,
+  getActiveEventsByGuild,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
@@ -392,5 +393,16 @@ describe('db', () => {
   test('migrateCleanupColumn is a no-op when the column already exists', () => {
     const db = makeTestDb();
     expect(() => migrateCleanupColumn(db)).not.toThrow();
+  });
+
+  test('getActiveEventsByGuild returns only events for that guild that have not been cleaned up', () => {
+    const db = makeTestDb();
+    const activeEvent = makeTestEvent(db, { guildId: 'guild-1', messageId: 'message-1' });
+    const cleanedEvent = makeTestEvent(db, { guildId: 'guild-1', messageId: 'message-2' });
+    makeTestEvent(db, { guildId: 'guild-2', messageId: 'message-3' });
+    markEventCleaned(db, cleanedEvent.id, '2026-07-12T22:00:00.000Z');
+
+    const active = getActiveEventsByGuild(db, 'guild-1');
+    expect(active.map((e) => e.id)).toEqual([activeEvent.id]);
   });
 });

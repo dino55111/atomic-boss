@@ -3,6 +3,7 @@ const path = require('path');
 const { Client, GatewayIntentBits, Events } = require('discord.js');
 const { initDb } = require('./db/db');
 const createEventCommand = require('./commands/create-event');
+const listEventsCommand = require('./commands/list-events');
 const { handleCreateEventModal } = require('./interactions/create-event-modal');
 const { handleJoinModal } = require('./interactions/join-modal');
 const {
@@ -27,7 +28,10 @@ const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup')
 // volume (e.g. Fly.io's /data) instead of the repo-relative default used
 // for local development.
 const db = initDb(process.env.DB_PATH || path.join(__dirname, '..', 'data.db'));
-const commands = new Map([[createEventCommand.data.name, createEventCommand]]);
+const commands = new Map([
+  [createEventCommand.data.name, createEventCommand],
+  [listEventsCommand.data.name, listEventsCommand],
+]);
 
 const handleInteraction = createInteractionHandler({
   commands,

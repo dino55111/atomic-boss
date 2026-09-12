@@ -18,7 +18,7 @@ function createInteractionHandler({
   return async function handleInteraction(interaction) {
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);
-      if (command) await command.execute(interaction);
+      if (command) await command.execute(interaction, db);
       return;
     }
 

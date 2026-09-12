@@ -32,15 +32,16 @@ function makeHandlers(overrides = {}) {
 }
 
 describe('createInteractionHandler', () => {
-  test('routes chat input commands to the matching command handler', async () => {
+  test('routes chat input commands to the matching command handler, with the db', async () => {
     const execute = jest.fn(async () => {});
     const commands = new Map([['boss', { execute }]]);
-    const handle = createInteractionHandler(makeHandlers({ commands }));
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ commands, db }));
     const interaction = makeBaseInteraction({ isChatInputCommand: () => true, commandName: 'boss' });
 
     await handle(interaction);
 
-    expect(execute).toHaveBeenCalledWith(interaction);
+    expect(execute).toHaveBeenCalledWith(interaction, db);
   });
 
   test('routes signup button clicks to handleSignupButton', async () => {
