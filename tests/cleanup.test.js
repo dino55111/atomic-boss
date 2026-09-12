@@ -72,6 +72,38 @@ describe('checkAndCleanupEvents', () => {
     expect(thread.delete).not.toHaveBeenCalled();
   });
 
+  test('treats an already-deleted announcement message as already cleaned up', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    const now = new Date(2026, 6, 12, 22, 1);
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+    const thread = { delete: jest.fn(async () => {}) };
+    const client = { channels: { fetch: jest.fn(async (id) => (id === 'thread-1' ? thread : channel)) } };
+
+    await checkAndCleanupEvents(client, db, now);
+
+    expect(thread.delete).toHaveBeenCalledTimes(1);
+    expect(getEventById(db, event.id).cleaned_at).toBe(now.toISOString());
+  });
+
+  test('treats an already-deleted thread as already cleaned up', async () => {
+    const db = initDb(':memory:');
+    const event = makeDueEvent(db);
+    const now = new Date(2026, 6, 12, 22, 1);
+    const unknownChannel = Object.assign(new Error('Unknown Channel'), { code: 10003 });
+    const { client, message } = makeClientAndChannel();
+    client.channels.fetch.mockImplementation(async (id) => {
+      if (id === 'thread-1') throw unknownChannel;
+      return { messages: { fetch: jest.fn(async () => message) } };
+    });
+
+    await checkAndCleanupEvents(client, db, now);
+
+    expect(message.delete).toHaveBeenCalledTimes(1);
+    expect(getEventById(db, event.id).cleaned_at).toBe(now.toISOString());
+  });
+
   test('isolates a failure cleaning up one event from other due events in the same poll', async () => {
     const db = initDb(':memory:');
     const failingEvent = makeDueEvent(db, { messageId: 'message-1', threadId: 'thread-bad' });

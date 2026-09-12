@@ -7,6 +7,22 @@ const { resolveEventStartDateTime } = require('./reminders');
 const CLEANUP_DELAY_MS = 2 * 60 * 60 * 1000;
 const CLEANUP_POLL_INTERVAL_MS = 60 * 1000;
 
+// Discord API error codes for a resource that's already gone (someone
+// deleted it by hand, or a previous poll got partway through before
+// failing). Either way the cleanup's goal is already met, so this is
+// treated as success rather than retried forever.
+const ALREADY_GONE_CODES = new Set([10003, 10008]); // Unknown Channel, Unknown Message
+
+async function deleteIfPresent(fetchAndDelete) {
+  try {
+    await fetchAndDelete();
+  } catch (error) {
+    if (!ALREADY_GONE_CODES.has(error.code)) {
+      throw error;
+    }
+  }
+}
+
 async function checkAndCleanupEvents(client, db, now = new Date()) {
   const pendingEvents = getEventsPendingCleanup(db);
 
@@ -19,13 +35,17 @@ async function checkAndCleanupEvents(client, db, now = new Date()) {
         continue;
       }
 
-      const channel = await client.channels.fetch(event.channel_id);
-      const message = await channel.messages.fetch(event.message_id);
-      await message.delete();
+      await deleteIfPresent(async () => {
+        const channel = await client.channels.fetch(event.channel_id);
+        const message = await channel.messages.fetch(event.message_id);
+        await message.delete();
+      });
 
       if (event.thread_id) {
-        const thread = await client.channels.fetch(event.thread_id);
-        await thread.delete();
+        await deleteIfPresent(async () => {
+          const thread = await client.channels.fetch(event.thread_id);
+          await thread.delete();
+        });
       }
 
       markEventCleaned(db, event.id, now.toISOString());
