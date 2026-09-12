@@ -1,5 +1,5 @@
 const { initDb, createEvent, updateEventThreadId, addSignup, markEventCleaned } = require('../src/db/db');
-const { data, execute } = require('../src/commands/list-events');
+const { data, execute, LIST_REPLY_TTL_MS } = require('../src/commands/list-events');
 
 function makeEvent(db, overrides = {}) {
   return createEvent(db, {
@@ -86,5 +86,48 @@ describe('list-events command', () => {
     await execute(interaction, db);
 
     expect(interaction.reply).toHaveBeenCalledWith({ content: '目前沒有進行中的揪團', ephemeral: true });
+  });
+});
+
+describe('list-events command auto-delete', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test('does not delete the reply before LIST_REPLY_TTL_MS has passed', async () => {
+    const db = initDb(':memory:');
+    const interaction = { guildId: 'guild-1', reply: jest.fn(async () => {}), deleteReply: jest.fn(async () => {}) };
+
+    await execute(interaction, db);
+    jest.advanceTimersByTime(LIST_REPLY_TTL_MS - 1);
+
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+  });
+
+  test('deletes the reply once LIST_REPLY_TTL_MS has passed', async () => {
+    const db = initDb(':memory:');
+    const interaction = { guildId: 'guild-1', reply: jest.fn(async () => {}), deleteReply: jest.fn(async () => {}) };
+
+    await execute(interaction, db);
+    jest.advanceTimersByTime(LIST_REPLY_TTL_MS);
+
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
+  });
+
+  test('a deleteReply failure (e.g. already dismissed) does not throw', async () => {
+    const db = initDb(':memory:');
+    const interaction = {
+      guildId: 'guild-1',
+      reply: jest.fn(async () => {}),
+      deleteReply: jest.fn(async () => { throw new Error('Unknown Message'); }),
+    };
+
+    await execute(interaction, db);
+
+    expect(() => jest.advanceTimersByTime(LIST_REPLY_TTL_MS)).not.toThrow();
   });
 });
