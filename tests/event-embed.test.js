@@ -1,4 +1,4 @@
-const { buildEventEmbed, buildActionRow } = require('../src/embeds/event-embed');
+const { buildEventEmbed, buildActionRow, updateEventAnnouncement } = require('../src/embeds/event-embed');
 const { TITLE_NOTES } = require('../src/commands/create-event');
 
 const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
@@ -113,5 +113,47 @@ describe('buildActionRow', () => {
   test('cancel button is always enabled', () => {
     const row = buildActionRow(baseEvent, 2);
     expect(row.components[2].data.disabled).toBeFalsy();
+  });
+});
+
+describe('updateEventAnnouncement', () => {
+  test('fetches the announcement message and edits it with the rebuilt embed and row', async () => {
+    const message = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => message) } };
+
+    await updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []);
+
+    expect(channel.messages.fetch).toHaveBeenCalledWith('message-1');
+    expect(message.edit).toHaveBeenCalledTimes(1);
+    const payload = message.edit.mock.calls[0][0];
+    expect(payload.embeds).toHaveLength(1);
+    expect(payload.components).toHaveLength(1);
+  });
+
+  test('silently does nothing when the announcement message was already deleted', async () => {
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+
+    await expect(
+      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+    ).resolves.toBeUndefined();
+  });
+
+  test('silently does nothing when the announcement channel was already deleted', async () => {
+    const unknownChannel = Object.assign(new Error('Unknown Channel'), { code: 10003 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw unknownChannel; }) } };
+
+    await expect(
+      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+    ).resolves.toBeUndefined();
+  });
+
+  test('still throws for other errors, e.g. missing permissions', async () => {
+    const forbidden = Object.assign(new Error('Missing Access'), { code: 50001 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw forbidden; }) } };
+
+    await expect(
+      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+    ).rejects.toThrow('Missing Access');
   });
 });

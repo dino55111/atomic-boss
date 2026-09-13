@@ -1,5 +1,6 @@
 const { getEventsPendingCleanup, markEventCleaned } = require('./db/db');
 const { resolveEventStartDateTime } = require('./reminders');
+const { isAlreadyGoneError } = require('./discord-errors');
 
 // "結束" has no explicit tracking of its own — an event is considered over
 // CLEANUP_DELAY_MS after its start_time, same as the reminder's lead time is
@@ -7,17 +8,14 @@ const { resolveEventStartDateTime } = require('./reminders');
 const CLEANUP_DELAY_MS = 2 * 60 * 60 * 1000;
 const CLEANUP_POLL_INTERVAL_MS = 60 * 1000;
 
-// Discord API error codes for a resource that's already gone (someone
-// deleted it by hand, or a previous poll got partway through before
-// failing). Either way the cleanup's goal is already met, so this is
-// treated as success rather than retried forever.
-const ALREADY_GONE_CODES = new Set([10003, 10008]); // Unknown Channel, Unknown Message
-
 async function deleteIfPresent(fetchAndDelete) {
   try {
     await fetchAndDelete();
   } catch (error) {
-    if (!ALREADY_GONE_CODES.has(error.code)) {
+    // A resource that's already gone (deleted by hand, or a previous poll
+    // got partway through before failing) means the cleanup's goal is
+    // already met, so this is treated as success rather than retried forever.
+    if (!isAlreadyGoneError(error)) {
       throw error;
     }
   }

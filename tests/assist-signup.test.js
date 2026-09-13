@@ -255,6 +255,32 @@ describe('handleAssistJoinModal', () => {
     );
   });
 
+  test('still signs up and notifies the thread when the announcement message was already deleted', async () => {
+    // Regression: checkAndCleanupEvents (or a human) can delete the
+    // announcement message while its thread survives, leaving a stale
+    // signup card behind. Clicking 代報名 on it must not silently fail.
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      thread,
+    });
+    interaction.channel.messages.fetch = jest.fn(async () => { throw unknownMessage; });
+
+    await expect(handleAssistJoinModal(interaction, db)).resolves.not.toThrow();
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup).toMatchObject({ user_id: 'user-9', added_by_user_id: 'helper-1' });
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('由 <@helper-1> 代為報名'),
+    }));
+  });
+
   test('replies with a follow-up and does not sign up when the event is full', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 1 });

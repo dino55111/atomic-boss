@@ -181,6 +181,35 @@ describe('handleCancelButton', () => {
     expect(getSignups(db, event.id)).toHaveLength(0);
   });
 
+  test('still cancels and notifies the thread when the announcement message was already deleted', async () => {
+    // Regression: checkAndCleanupEvents (or a human) can delete the
+    // announcement message while its thread survives, leaving a stale
+    // signup card behind. Clicking 取消報名 on it must not silently fail —
+    // the interaction never even got a reply before this fix.
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'alice#1' });
+
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const thread = { send: jest.fn(async () => {}), members: { remove: jest.fn(async () => {}) } };
+    const interaction = {
+      customId: `cancel:${event.id}`,
+      user: { id: 'user-1' },
+      reply: jest.fn(async () => {}),
+      channel: { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } },
+      client: { channels: { fetch: jest.fn(async () => thread) } },
+    };
+
+    await expect(handleCancelButton(interaction, db)).resolves.not.toThrow();
+
+    expect(getSignups(db, event.id)).toHaveLength(0);
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('<@user-1> 已取消報名'),
+    }));
+    expect(interaction.reply).toHaveBeenCalledWith(expect.objectContaining({ content: '已取消報名' }));
+  });
+
   test('scopes allowedMentions to prevent unparsed mention syntax in display_name from pinging', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db);

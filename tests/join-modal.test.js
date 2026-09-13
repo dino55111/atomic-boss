@@ -187,6 +187,31 @@ describe('handleJoinModal', () => {
     expect(interaction2.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
   });
 
+  test('still records the signup, posts to the thread, when the announcement message was already deleted', async () => {
+    // Regression: checkAndCleanupEvents (or a human) can delete the
+    // announcement message while its thread survives, leaving a stale
+    // signup card behind. Clicking 報名 on it must not silently fail —
+    // the signup and thread announcement still have to go through.
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 2 });
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeInteraction({
+      eventId: event.id,
+      className: '冰雷',
+      userId: 'user-1',
+      fieldValues: { level: '70', game_id: 'alice#1' },
+      thread,
+    });
+    interaction.channel.messages.fetch = jest.fn(async () => { throw unknownMessage; });
+
+    await expect(handleJoinModal(interaction, db)).resolves.not.toThrow();
+
+    const [signup] = getSignups(db, event.id);
+    expect(signup.class).toBe('冰雷');
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({ content: expect.stringContaining('冰雷') }));
+  });
+
   test('deletes the class-picker message and replies with a follow-up when the event no longer exists', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ eventId: 999, className: '冰雷', userId: 'user-1', fieldValues: { level: 'y', game_id: 'z' }, fetchedMessage: {} });

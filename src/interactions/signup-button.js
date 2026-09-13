@@ -12,7 +12,7 @@ const {
   getSignupById,
   removeSignupById,
 } = require('../db/db');
-const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
+const { updateEventAnnouncement } = require('../embeds/event-embed');
 
 const CLASS_OPTIONS = [
   '冰雷', '火毒', '主教', '箭神', '神射手', '暗影神偷',
@@ -146,11 +146,7 @@ async function applyCancellation(interaction, db, event, signup) {
   removeSignupById(db, signup.id);
 
   const signups = getSignups(db, event.id);
-  const embed = buildEventEmbed(event, signups);
-  const row = buildActionRow(event, signups.length);
-
-  const message = await interaction.channel.messages.fetch(event.message_id);
-  await message.edit({ embeds: [embed], components: [row] });
+  await updateEventAnnouncement(interaction.channel, event, signups);
 
   const nameSegment = signup.is_external ? `**${signup.display_name}**` : `<@${signup.user_id}>`;
   const assistSegment = interaction.user.id === signup.user_id ? '' : `（由 <@${interaction.user.id}> 代為取消）`;

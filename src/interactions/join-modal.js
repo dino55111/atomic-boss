@@ -6,7 +6,7 @@ const {
   ADD_SIGNUP_FULL,
   ADD_SIGNUP_DUPLICATE,
 } = require('../db/db');
-const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
+const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 
 // An optional TextInput left blank is omitted from the modal submission
@@ -67,11 +67,7 @@ async function handleJoinModal(interaction, db) {
   }
 
   const signups = getSignups(db, event.id);
-  const embed = buildEventEmbed(event, signups);
-  const row = buildActionRow(event, signups.length);
-
-  const message = await interaction.channel.messages.fetch(event.message_id);
-  await message.edit({ embeds: [embed], components: [row] });
+  await updateEventAnnouncement(interaction.channel, event, signups);
 
   const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);

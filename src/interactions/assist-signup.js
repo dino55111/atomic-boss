@@ -9,7 +9,7 @@ const {
   UserSelectMenuBuilder,
 } = require('discord.js');
 const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
-const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
+const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { getOptionalTextInputValue } = require('./join-modal');
 const { buildClassButtonRowsForCustomIds } = require('./signup-button');
@@ -180,11 +180,7 @@ async function handleAssistJoinModal(interaction, db) {
   }
 
   const signups = getSignups(db, event.id);
-  const embed = buildEventEmbed(event, signups);
-  const row = buildActionRow(event, signups.length);
-
-  const message = await interaction.channel.messages.fetch(event.message_id);
-  await message.edit({ embeds: [embed], components: [row] });
+  await updateEventAnnouncement(interaction.channel, event, signups);
 
   const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
   const noteSegment = note ? `／備註：${note}` : '';

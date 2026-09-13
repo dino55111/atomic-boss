@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { TITLE_NOTES } = require('../commands/create-event');
+const { isAlreadyGoneError } = require('../discord-errors');
 
 function buildEventEmbed(event, signups) {
   const roster = signups.length === 0
@@ -52,4 +53,24 @@ function buildActionRow(event, signupCount) {
   return new ActionRowBuilder().addComponents(signupButton, assistButton, cancelButton);
 }
 
-module.exports = { buildEventEmbed, buildActionRow };
+// The scheduled cleanup (or a human) can delete the announcement message
+// while its thread survives, leaving a stale signup card behind whose
+// buttons still look clickable. Fetching/editing it then 404s with Unknown
+// Message (or Unknown Channel, if the whole channel is gone) — that's not a
+// bug the caller needs to recover from, just nothing left to update, so it's
+// swallowed here instead of aborting the signup/cancellation that triggered it.
+async function updateEventAnnouncement(channel, event, signups) {
+  const embed = buildEventEmbed(event, signups);
+  const row = buildActionRow(event, signups.length);
+
+  try {
+    const message = await channel.messages.fetch(event.message_id);
+    await message.edit({ embeds: [embed], components: [row] });
+  } catch (error) {
+    if (!isAlreadyGoneError(error)) {
+      throw error;
+    }
+  }
+}
+
+module.exports = { buildEventEmbed, buildActionRow, updateEventAnnouncement };
