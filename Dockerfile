@@ -17,6 +17,12 @@ COPY . .
 FROM node:20-slim
 WORKDIR /app
 ENV NODE_ENV=production
+# Event start times are entered and stored as "M/D HH:mm" Asia/Taipei
+# wall-clock time (reminders.js, cleanup.js), computed via `new Date(year,
+# month, day, hour, minute)` — that reads its fields in the process's local
+# timezone. Without this, the image defaults to UTC and every reminder/
+# cleanup fires 8 hours off from the real event time.
+ENV TZ=Asia/Taipei
 
 COPY --from=build /app /app
 
