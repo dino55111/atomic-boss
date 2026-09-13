@@ -61,7 +61,7 @@ async function checkAndSendReminders(client, db, now = new Date()) {
 
       const thread = await client.channels.fetch(event.thread_id);
       await thread.send({
-        content: `⏰ 距離「${event.title}（${event.session}場）」開始還有 ${REMINDER_LEAD_MINUTES} 分鐘（${event.start_time}），已報名的人記得準時出席：${mentions}`,
+        content: `⏰「${event.start_time} ${event.title} ${event.session}場」開始還有 1 小時，隊長請給集合頻道，已報名的人記得準時出席：${mentions}`,
         allowedMentions: { users: mentionableUserIds },
       });
 

@@ -1,4 +1,4 @@
-const { resolveEventStartDateTime, checkAndSendReminders, REMINDER_LEAD_MINUTES } = require('../src/reminders');
+const { resolveEventStartDateTime, checkAndSendReminders } = require('../src/reminders');
 const { initDb, createEvent, updateEventThreadId, addSignup, getEventById, markEventReminded } = require('../src/db/db');
 
 describe('resolveEventStartDateTime', () => {
@@ -119,11 +119,11 @@ describe('checkAndSendReminders', () => {
 
     expect(client.channels.fetch).toHaveBeenCalledWith('thread-1');
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('週三夜間團（1場）'),
+      content: expect.stringContaining('「7/12 20:00 週三夜間團 1場」'),
       allowedMentions: { users: ['user-1'] },
     }));
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining(`${REMINDER_LEAD_MINUTES} 分鐘`),
+      content: expect.stringContaining('1 小時，隊長請給集合頻道'),
     }));
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('<@user-1>'),
