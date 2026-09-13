@@ -67,7 +67,7 @@ async function handleJoinModal(interaction, db) {
   }
 
   const signups = getSignups(db, event.id);
-  await updateEventAnnouncement(interaction.channel, event, signups);
+  await updateEventAnnouncement(interaction.client, event, signups);
 
   const noteSegment = note ? `／備註：${note}` : '';
   const thread = await interaction.client.channels.fetch(event.thread_id);

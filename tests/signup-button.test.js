@@ -24,6 +24,13 @@ function makeEvent(db, overrides = {}) {
   });
 }
 
+// updateEventAnnouncement fetches both the main channel and (when present)
+// the event's thread by id off the client, rather than trusting whichever
+// channel the interaction happened to come from — see event-embed.test.js.
+function makeClient(channelsById) {
+  return { channels: { fetch: jest.fn(async (id) => channelsById[id]) } };
+}
+
 describe('buildClassButtonRows', () => {
   test('lays out all 12 class options across 3 rows of 4 buttons', () => {
     const rows = buildClassButtonRows(42);
@@ -121,8 +128,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -147,8 +153,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -171,8 +176,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -197,8 +201,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } }, 'thread-1': thread }),
     };
 
     await expect(handleCancelButton(interaction, db)).resolves.not.toThrow();
@@ -222,8 +225,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -248,8 +250,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -325,8 +326,7 @@ describe('handleCancelButton', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'user-9' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -378,8 +378,7 @@ describe('handleCancelButton with multiple cancellable signups', () => {
       customId: `cancel:${event.id}`,
       user: { id: 'creator-1' },
       reply: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelButton(interaction, db);
@@ -412,8 +411,7 @@ describe('handleCancelSelectButton', () => {
       customId: `cancel-select:${event.id}:${signup.id}`,
       user: { id: 'helper-1' },
       update: jest.fn(async () => {}),
-      channel: { messages: { fetch: jest.fn(async () => editedMessage) } },
-      client: { channels: { fetch: jest.fn(async () => thread) } },
+      client: makeClient({ 'channel-1': { messages: { fetch: jest.fn(async () => editedMessage) } }, 'thread-1': thread }),
     };
 
     await handleCancelSelectButton(interaction, db);

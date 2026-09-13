@@ -1,4 +1,4 @@
-const { createEvent, updateEventMessageId, updateEventThreadId } = require('../db/db');
+const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
 const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
@@ -63,6 +63,13 @@ async function handleCreateEventModal(interaction, db) {
 
   const thread = await message.startThread({ name: `${startTime} ${title} ${session}場`.slice(0, 100) });
   updateEventThreadId(db, event.id, thread.id);
+
+  // Discord doesn't reliably let you click the buttons on a thread's starter
+  // message from within the thread itself (they work fine from the main
+  // channel) — see updateEventAnnouncement. Posting a second, independent
+  // copy of the card straight into the thread gives it working buttons too.
+  const threadMessage = await thread.send({ embeds: [embed], components: [row] });
+  updateEventThreadMessageId(db, event.id, threadMessage.id);
 }
 
 module.exports = { handleCreateEventModal, isValidStartTime };

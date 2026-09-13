@@ -111,8 +111,12 @@ function makeEvent(db, overrides = {}) {
   return event;
 }
 
+// updateEventAnnouncement fetches both the main channel and (when present)
+// the event's thread by id off the client, rather than trusting whichever
+// channel the interaction happened to come from — see event-embed.test.js.
 function makeAssistModalInteraction({ customId, helperId, fieldValues, fetchedUser, fetchedMessage, thread }) {
   const fieldEntries = new Map(Object.entries(fieldValues).map(([id, value]) => [id, { value }]));
+  const channel = { messages: { fetch: jest.fn(async () => fetchedMessage) } };
   return {
     customId,
     user: { id: helperId, username: helperId },
@@ -128,9 +132,9 @@ function makeAssistModalInteraction({ customId, helperId, fieldValues, fetchedUs
     deferUpdate: jest.fn(async () => {}),
     deleteReply: jest.fn(async () => {}),
     followUp: jest.fn(async () => {}),
-    channel: { messages: { fetch: jest.fn(async () => fetchedMessage) } },
+    channel,
     client: {
-      channels: { fetch: jest.fn(async () => thread) },
+      channels: { fetch: jest.fn(async (id) => (id === 'thread-1' ? thread : channel)) },
       users: { fetch: jest.fn(async () => fetchedUser) },
     },
   };

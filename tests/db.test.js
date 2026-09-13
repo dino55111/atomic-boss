@@ -5,12 +5,14 @@ const {
   migrateEventsTable,
   migrateRemindersColumn,
   migrateCleanupColumn,
+  migrateThreadMessageIdColumn,
   createEvent,
   getActiveEventsByGuild,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
+  updateEventThreadMessageId,
   getEventsPendingReminder,
   markEventReminded,
   getEventsPendingCleanup,
@@ -73,6 +75,14 @@ describe('db', () => {
     expect(getEventById(db, event.id).thread_id).toBeNull();
     updateEventThreadId(db, event.id, 'thread-1');
     expect(getEventById(db, event.id).thread_id).toBe('thread-1');
+  });
+
+  test('updateEventThreadMessageId updates the stored thread message id', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    expect(getEventById(db, event.id).thread_message_id).toBeNull();
+    updateEventThreadMessageId(db, event.id, 'thread-message-1');
+    expect(getEventById(db, event.id).thread_message_id).toBe('thread-message-1');
   });
 
   test('addSignup adds a signup and countSignups reflects it', () => {
@@ -388,6 +398,37 @@ describe('db', () => {
 
     const columns = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
     expect(columns).toEqual(expect.arrayContaining(['cleaned_at']));
+  });
+
+  test('migrateThreadMessageIdColumn adds the thread_message_id column to an older events table', () => {
+    const db = new Database(':memory:');
+    db.exec(`
+      CREATE TABLE events (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id      TEXT NOT NULL,
+        channel_id    TEXT NOT NULL,
+        message_id    TEXT NOT NULL,
+        thread_id     TEXT,
+        title         TEXT NOT NULL,
+        capacity      INTEGER NOT NULL,
+        session       INTEGER NOT NULL DEFAULT 1,
+        start_time    TEXT NOT NULL,
+        creator_id    TEXT NOT NULL,
+        created_at    TEXT NOT NULL,
+        reminded_at   TEXT,
+        cleaned_at    TEXT
+      );
+    `);
+
+    migrateThreadMessageIdColumn(db);
+
+    const columns = db.prepare('PRAGMA table_info(events)').all().map((c) => c.name);
+    expect(columns).toEqual(expect.arrayContaining(['thread_message_id']));
+  });
+
+  test('migrateThreadMessageIdColumn is a no-op when the column already exists', () => {
+    const db = makeTestDb();
+    expect(() => migrateThreadMessageIdColumn(db)).not.toThrow();
   });
 
   test('migrateCleanupColumn is a no-op when the column already exists', () => {

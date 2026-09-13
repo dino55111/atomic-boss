@@ -116,13 +116,40 @@ describe('buildActionRow', () => {
   });
 });
 
+// updateEventAnnouncement takes the client (not a single channel) because the
+// same card lives in two places: the main-channel announcement and its copy
+// posted into the event's thread. Which channel an interaction came from is
+// no longer a reliable way to reach "the" announcement once the thread copy's
+// buttons are clickable too, so both are always fetched by id from the client.
+function makeClient(channelsById) {
+  return {
+    channels: {
+      fetch: jest.fn(async (id) => {
+        const entry = channelsById[id];
+        if (entry instanceof Error) throw entry;
+        return entry;
+      }),
+    },
+  };
+}
+
+const eventWithThreadCopy = {
+  ...baseEvent,
+  channel_id: 'channel-1',
+  message_id: 'message-1',
+  thread_id: 'thread-1',
+  thread_message_id: 'thread-message-1',
+};
+
 describe('updateEventAnnouncement', () => {
   test('fetches the announcement message and edits it with the rebuilt embed and row', async () => {
     const message = { edit: jest.fn(async () => {}) };
     const channel = { messages: { fetch: jest.fn(async () => message) } };
+    const client = makeClient({ 'channel-1': channel });
 
-    await updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []);
+    await updateEventAnnouncement(client, { ...baseEvent, channel_id: 'channel-1', message_id: 'message-1' }, []);
 
+    expect(client.channels.fetch).toHaveBeenCalledWith('channel-1');
     expect(channel.messages.fetch).toHaveBeenCalledWith('message-1');
     expect(message.edit).toHaveBeenCalledTimes(1);
     const payload = message.edit.mock.calls[0][0];
@@ -130,30 +157,80 @@ describe('updateEventAnnouncement', () => {
     expect(payload.components).toHaveLength(1);
   });
 
+  test('also fetches and edits the thread copy when the event has one', async () => {
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const threadMessage = { edit: jest.fn(async () => {}) };
+    const thread = { messages: { fetch: jest.fn(async () => threadMessage) } };
+    const client = makeClient({ 'channel-1': channel, 'thread-1': thread });
+
+    await updateEventAnnouncement(client, eventWithThreadCopy, []);
+
+    expect(client.channels.fetch).toHaveBeenCalledWith('thread-1');
+    expect(thread.messages.fetch).toHaveBeenCalledWith('thread-message-1');
+    expect(threadMessage.edit).toHaveBeenCalledTimes(1);
+  });
+
+  test('skips the thread copy when the event has no thread_message_id (created before this feature)', async () => {
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const client = makeClient({ 'channel-1': channel });
+
+    await updateEventAnnouncement(client, { ...baseEvent, channel_id: 'channel-1', message_id: 'message-1', thread_id: 'thread-1', thread_message_id: null }, []);
+
+    expect(client.channels.fetch).toHaveBeenCalledTimes(1);
+    expect(client.channels.fetch).not.toHaveBeenCalledWith('thread-1');
+  });
+
   test('silently does nothing when the announcement message was already deleted', async () => {
     const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
     const channel = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+    const client = makeClient({ 'channel-1': channel });
 
     await expect(
-      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+      updateEventAnnouncement(client, { ...baseEvent, channel_id: 'channel-1', message_id: 'message-1' }, []),
     ).resolves.toBeUndefined();
   });
 
   test('silently does nothing when the announcement channel was already deleted', async () => {
     const unknownChannel = Object.assign(new Error('Unknown Channel'), { code: 10003 });
-    const channel = { messages: { fetch: jest.fn(async () => { throw unknownChannel; }) } };
+    const client = makeClient({ 'channel-1': unknownChannel });
 
     await expect(
-      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+      updateEventAnnouncement(client, { ...baseEvent, channel_id: 'channel-1', message_id: 'message-1' }, []),
     ).resolves.toBeUndefined();
+  });
+
+  test('still edits the thread copy when only the main announcement was deleted', async () => {
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+    const threadMessage = { edit: jest.fn(async () => {}) };
+    const thread = { messages: { fetch: jest.fn(async () => threadMessage) } };
+    const client = makeClient({ 'channel-1': channel, 'thread-1': thread });
+
+    await updateEventAnnouncement(client, eventWithThreadCopy, []);
+
+    expect(threadMessage.edit).toHaveBeenCalledTimes(1);
+  });
+
+  test('still edits the main announcement when only the thread copy was deleted', async () => {
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const thread = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+    const client = makeClient({ 'channel-1': channel, 'thread-1': thread });
+
+    await expect(updateEventAnnouncement(client, eventWithThreadCopy, [])).resolves.toBeUndefined();
+    expect(channelMessage.edit).toHaveBeenCalledTimes(1);
   });
 
   test('still throws for other errors, e.g. missing permissions', async () => {
     const forbidden = Object.assign(new Error('Missing Access'), { code: 50001 });
     const channel = { messages: { fetch: jest.fn(async () => { throw forbidden; }) } };
+    const client = makeClient({ 'channel-1': channel });
 
     await expect(
-      updateEventAnnouncement(channel, { ...baseEvent, message_id: 'message-1' }, []),
+      updateEventAnnouncement(client, { ...baseEvent, channel_id: 'channel-1', message_id: 'message-1' }, []),
     ).rejects.toThrow('Missing Access');
   });
 });

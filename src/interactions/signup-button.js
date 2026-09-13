@@ -146,7 +146,7 @@ async function applyCancellation(interaction, db, event, signup) {
   removeSignupById(db, signup.id);
 
   const signups = getSignups(db, event.id);
-  await updateEventAnnouncement(interaction.channel, event, signups);
+  await updateEventAnnouncement(interaction.client, event, signups);
 
   const nameSegment = signup.is_external ? `**${signup.display_name}**` : `<@${signup.user_id}>`;
   const assistSegment = interaction.user.id === signup.user_id ? '' : `（由 <@${interaction.user.id}> 代為取消）`;

@@ -2,7 +2,8 @@ const { initDb, getEventById } = require('../src/db/db');
 const { handleCreateEventModal, isValidStartTime } = require('../src/interactions/create-event-modal');
 
 function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minute = '00', deferUpdateFails = false }) {
-  const startThread = jest.fn(async () => ({ id: 'thread-1' }));
+  const thread = { id: 'thread-1', send: jest.fn(async () => ({ id: 'thread-message-1' })) };
+  const startThread = jest.fn(async () => thread);
   const selectValues = { event_date: date, event_hour: hour, event_minute: minute };
   return {
     customId: `create-event-modal:${title}:${session}`,
@@ -24,6 +25,7 @@ function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minut
       })),
     },
     startThread,
+    thread,
   };
 }
 
@@ -62,6 +64,24 @@ describe('handleCreateEventModal', () => {
 
     const event = getEventById(db, 1);
     expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'message-1', thread_id: 'thread-1' });
+  });
+
+  // Discord doesn't reliably let you click the buttons on a thread's starter
+  // message from within the thread itself, so a second, independently
+  // clickable copy of the same card is posted straight into the thread.
+  test('also posts a copy of the signup card into the new thread and stores its message id', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉' });
+
+    await handleCreateEventModal(interaction, db);
+
+    expect(interaction.thread.send).toHaveBeenCalledTimes(1);
+    const threadPayload = interaction.thread.send.mock.calls[0][0];
+    expect(threadPayload.embeds).toHaveLength(1);
+    expect(threadPayload.components).toHaveLength(1);
+
+    const event = getEventById(db, 1);
+    expect(event.thread_message_id).toBe('thread-message-1');
   });
 
   test('thread name is prefixed with the composed 日期 時:分 and suffixed with the chosen session', async () => {

@@ -180,7 +180,7 @@ async function handleAssistJoinModal(interaction, db) {
   }
 
   const signups = getSignups(db, event.id);
-  await updateEventAnnouncement(interaction.channel, event, signups);
+  await updateEventAnnouncement(interaction.client, event, signups);
 
   const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
   const noteSegment = note ? `／備註：${note}` : '';

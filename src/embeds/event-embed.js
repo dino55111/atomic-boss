@@ -59,17 +59,41 @@ function buildActionRow(event, signupCount) {
 // Message (or Unknown Channel, if the whole channel is gone) — that's not a
 // bug the caller needs to recover from, just nothing left to update, so it's
 // swallowed here instead of aborting the signup/cancellation that triggered it.
-async function updateEventAnnouncement(channel, event, signups) {
-  const embed = buildEventEmbed(event, signups);
-  const row = buildActionRow(event, signups.length);
-
+async function editIfPresent(fetchAndEdit) {
   try {
-    const message = await channel.messages.fetch(event.message_id);
-    await message.edit({ embeds: [embed], components: [row] });
+    await fetchAndEdit();
   } catch (error) {
     if (!isAlreadyGoneError(error)) {
       throw error;
     }
+  }
+}
+
+// The signup card exists in two places: the main-channel announcement, and a
+// copy posted into the event's thread so its buttons work from inside the
+// thread too (Discord doesn't reliably let you click the buttons on a
+// thread's starter message from within the thread itself). An interaction
+// can come from either copy, so which channel triggered the update is not a
+// reliable way to find "the" announcement — both are always looked up by id
+// from the client instead, and updated independently so one being deleted
+// doesn't stop the other from staying in sync.
+async function updateEventAnnouncement(client, event, signups) {
+  const embed = buildEventEmbed(event, signups);
+  const row = buildActionRow(event, signups.length);
+  const payload = { embeds: [embed], components: [row] };
+
+  await editIfPresent(async () => {
+    const channel = await client.channels.fetch(event.channel_id);
+    const message = await channel.messages.fetch(event.message_id);
+    await message.edit(payload);
+  });
+
+  if (event.thread_id && event.thread_message_id) {
+    await editIfPresent(async () => {
+      const thread = await client.channels.fetch(event.thread_id);
+      const message = await thread.messages.fetch(event.thread_message_id);
+      await message.edit(payload);
+    });
   }
 }
 

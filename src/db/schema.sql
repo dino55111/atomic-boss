@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS events (
   channel_id    TEXT NOT NULL,
   message_id    TEXT NOT NULL,
   thread_id     TEXT,
+  thread_message_id TEXT,
   title         TEXT NOT NULL,
   capacity      INTEGER NOT NULL,
   session       INTEGER NOT NULL DEFAULT 1,

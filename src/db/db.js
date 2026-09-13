@@ -33,6 +33,13 @@ function migrateCleanupColumn(db) {
   }
 }
 
+function migrateThreadMessageIdColumn(db) {
+  const columns = db.prepare('PRAGMA table_info(events)').all().map((col) => col.name);
+  if (!columns.includes('thread_message_id')) {
+    db.exec('ALTER TABLE events ADD COLUMN thread_message_id TEXT');
+  }
+}
+
 function initDb(dbPath) {
   const db = new Database(dbPath);
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
@@ -41,6 +48,7 @@ function initDb(dbPath) {
   migrateEventsTable(db);
   migrateRemindersColumn(db);
   migrateCleanupColumn(db);
+  migrateThreadMessageIdColumn(db);
   return db;
 }
 
@@ -67,6 +75,10 @@ function updateEventMessageId(db, eventId, messageId) {
 
 function updateEventThreadId(db, eventId, threadId) {
   db.prepare('UPDATE events SET thread_id = ? WHERE id = ?').run(threadId, eventId);
+}
+
+function updateEventThreadMessageId(db, eventId, threadMessageId) {
+  db.prepare('UPDATE events SET thread_message_id = ? WHERE id = ?').run(threadMessageId, eventId);
 }
 
 function getActiveEventsByGuild(db, guildId) {
@@ -169,12 +181,14 @@ module.exports = {
   migrateEventsTable,
   migrateRemindersColumn,
   migrateCleanupColumn,
+  migrateThreadMessageIdColumn,
   createEvent,
   getActiveEventsByGuild,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
   updateEventThreadId,
+  updateEventThreadMessageId,
   getEventsPendingReminder,
   markEventReminded,
   getEventsPendingCleanup,
