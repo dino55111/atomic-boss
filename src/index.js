@@ -30,6 +30,7 @@ const {
 const { createInteractionHandler } = require('./interaction-router');
 const { checkAndSendReminders, REMINDER_POLL_INTERVAL_MS } = require('./reminders');
 const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup');
+const { createMessageCreateHandler } = require('./command-only-channel');
 
 // DB_PATH lets a deployment point the SQLite file at a mounted persistent
 // volume (e.g. Fly.io's /data) instead of the repo-relative default used
@@ -63,7 +64,10 @@ const handleInteraction = createInteractionHandler({
   handleCancelEventAbortButton,
 });
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+// GuildMessages is only needed for the command-only-channel enforcement
+// below (messageCreate); nothing else here reads channel messages.
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+const handleMessageCreate = createMessageCreateHandler(process.env.COMMAND_ONLY_CHANNEL_ID);
 
 let reminderPollInFlight = false;
 let cleanupPollInFlight = false;
@@ -97,6 +101,12 @@ client.once(Events.ClientReady, (readyClient) => {
 client.on(Events.InteractionCreate, (interaction) => {
   handleInteraction(interaction).catch((error) => {
     console.error('Error handling interaction:', error);
+  });
+});
+
+client.on(Events.MessageCreate, (message) => {
+  handleMessageCreate(message).catch((error) => {
+    console.error('Error enforcing command-only channel:', error);
   });
 });
 

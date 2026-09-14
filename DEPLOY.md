@@ -30,6 +30,12 @@
    fly secrets set BOT_TOKEN=你的token CLIENT_ID=你的clientid GUILD_ID=你的guildid
    ```
 
+   如果要啟用「頻道只能用指令/按鈕」的限制（自動刪除一般聊天訊息），另外設：
+   ```
+   fly secrets set COMMAND_ONLY_CHANNEL_ID=你的頻道id
+   ```
+   沒設這個變數的話這個限制就不會啟用。啟用後記得確認 bot 的角色在該頻道有「管理訊息」(Manage Messages) 權限，不然刪不掉別人的訊息。
+
 5. **部署**
    ```
    fly deploy
