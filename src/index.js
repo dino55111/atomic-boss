@@ -20,6 +20,13 @@ const {
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
 } = require('./interactions/assist-signup');
+const {
+  handleEditTimeButton,
+  handleEditTimeModal,
+  handleCancelEventButton,
+  handleCancelEventConfirmButton,
+  handleCancelEventAbortButton,
+} = require('./interactions/manage-event');
 const { createInteractionHandler } = require('./interaction-router');
 const { checkAndSendReminders, REMINDER_POLL_INTERVAL_MS } = require('./reminders');
 const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup');
@@ -49,6 +56,11 @@ const handleInteraction = createInteractionHandler({
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleEditTimeButton,
+  handleEditTimeModal,
+  handleCancelEventButton,
+  handleCancelEventConfirmButton,
+  handleCancelEventAbortButton,
 });
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
