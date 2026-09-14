@@ -1,9 +1,20 @@
 const { buildEventEmbed, buildActionRow, updateEventAnnouncement } = require('../src/embeds/event-embed');
-const { TITLE_NOTES } = require('../src/commands/create-event');
+const { TITLE_NOTES, TITLE_EMOJIS } = require('../src/commands/create-event');
 
 const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
 
 describe('buildEventEmbed', () => {
+  test('prefixes the title with the matching title\'s emoji', () => {
+    const event = { ...baseEvent, title: '普拉' };
+    const embed = buildEventEmbed(event, []);
+    expect(embed.data.title).toBe(`${TITLE_EMOJIS['普拉']} 普拉`);
+  });
+
+  test('leaves the title as-is when there is no configured emoji for it', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    expect(embed.data.title).toBe(baseEvent.title);
+  });
+
   test('shows who opened the event', () => {
     const embed = buildEventEmbed(baseEvent, []);
     const creatorField = embed.data.fields.find((f) => f.name === '開團主');
