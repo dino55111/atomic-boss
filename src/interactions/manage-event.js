@@ -3,7 +3,13 @@ const {
   LabelBuilder,
   StringSelectMenuBuilder,
 } = require('discord.js');
+const { getEventById, getSignups, updateEventStartTime } = require('../db/db');
+const { updateEventAnnouncement } = require('../embeds/event-embed');
+const { isValidStartTime } = require('./create-event-modal');
 const { buildDateOptions, HOUR_OPTIONS, MINUTE_OPTIONS } = require('./title-choice-button');
+const { tryAcknowledgeAndDeleteReply } = require('./ack');
+const { buildMentionSegment } = require('../reminders');
+const { isAlreadyGoneError } = require('../discord-errors');
 
 const NOT_FOUND_MESSAGE = '找不到這個揪團，可能已經被刪除了';
 
@@ -64,8 +70,81 @@ function buildEditTimeModal(eventId, currentStartTime, now = new Date()) {
   return modal;
 }
 
+async function handleEditTimeButton(interaction, db) {
+  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const event = getEventById(db, eventId);
+
+  if (!event) {
+    await interaction.reply({ content: NOT_FOUND_MESSAGE, ephemeral: true });
+    return;
+  }
+
+  if (!(await requireCreator(interaction, event))) return;
+
+  await interaction.showModal(buildEditTimeModal(event.id, event.start_time));
+}
+
+async function notifyThreadOfNewTime(client, event, startTime, signups) {
+  if (!event.thread_id) return;
+
+  try {
+    const thread = await client.channels.fetch(event.thread_id);
+    await thread.setName(`${startTime} ${event.title} ${event.session}場`.slice(0, 100));
+
+    const mentions = signups.map(buildMentionSegment).join(' ');
+    const mentionableUserIds = signups.filter((s) => !s.is_external).map((s) => s.user_id);
+    await thread.send({
+      content: `⏰ 開團時間已改為 ${startTime}，已報名的人請留意：${mentions || '（目前尚無人報名）'}`,
+      allowedMentions: { users: mentionableUserIds },
+    });
+  } catch (error) {
+    if (!isAlreadyGoneError(error)) throw error;
+  }
+}
+
+async function handleEditTimeModal(interaction, db) {
+  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const date = interaction.fields.getStringSelectValues('event_date')[0];
+  const hour = interaction.fields.getStringSelectValues('event_hour')[0];
+  const minute = interaction.fields.getStringSelectValues('event_minute')[0];
+  const startTime = `${date} ${hour}:${minute}`;
+
+  // Multiple slow steps follow (DB write, two message edits, thread rename,
+  // thread notification) — ack immediately so none of that races Discord's
+  // 3-second interaction window, same reasoning as handleCreateEventModal.
+  const acked = await tryAcknowledgeAndDeleteReply(interaction);
+
+  if (!isValidStartTime(startTime)) {
+    if (acked) {
+      await interaction.followUp({ content: '時間格式錯誤，請重新點選「⏰ 改時間」設定', ephemeral: true });
+    }
+    return;
+  }
+
+  const event = getEventById(db, eventId);
+  if (!event) {
+    if (acked) {
+      await interaction.followUp({ content: NOT_FOUND_MESSAGE, ephemeral: true });
+    }
+    return;
+  }
+
+  updateEventStartTime(db, event.id, startTime);
+  const updatedEvent = getEventById(db, event.id);
+  const signups = getSignups(db, event.id);
+
+  await updateEventAnnouncement(interaction.client, updatedEvent, signups);
+  await notifyThreadOfNewTime(interaction.client, event, startTime, signups);
+
+  if (acked) {
+    await interaction.followUp({ content: '已更新時間', ephemeral: true });
+  }
+}
+
 module.exports = {
   NOT_FOUND_MESSAGE,
   requireCreator,
   buildEditTimeModal,
+  handleEditTimeButton,
+  handleEditTimeModal,
 };

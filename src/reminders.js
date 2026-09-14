@@ -72,4 +72,10 @@ async function checkAndSendReminders(client, db, now = new Date()) {
   }
 }
 
-module.exports = { resolveEventStartDateTime, checkAndSendReminders, REMINDER_LEAD_MINUTES, REMINDER_POLL_INTERVAL_MS };
+module.exports = {
+  resolveEventStartDateTime,
+  checkAndSendReminders,
+  buildMentionSegment,
+  REMINDER_LEAD_MINUTES,
+  REMINDER_POLL_INTERVAL_MS,
+};

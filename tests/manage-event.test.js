@@ -1,7 +1,32 @@
 const {
+  initDb,
+  getEventById,
+  createEvent,
+  updateEventThreadId,
+  updateEventThreadMessageId,
+  addSignup,
+  markEventReminded,
+} = require('../src/db/db');
+const {
   requireCreator,
   buildEditTimeModal,
+  handleEditTimeButton,
+  handleEditTimeModal,
 } = require('../src/interactions/manage-event');
+
+function makeEvent(db, overrides = {}) {
+  return createEvent(db, {
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    messageId: 'message-1',
+    title: '週三夜間團',
+    capacity: 5,
+    session: 3,
+    startTime: '7/12 20:00',
+    creatorId: 'creator-1',
+    ...overrides,
+  });
+}
 
 describe('requireCreator', () => {
   test('resolves true and does not reply when the clicker is the creator', async () => {
@@ -61,5 +86,189 @@ describe('buildEditTimeModal', () => {
 
     expect(dateSelect.options.filter((o) => o.data.default)).toHaveLength(1);
     expect(dateSelect.options.find((o) => o.data.default).data.value).toBe('9/5');
+  });
+});
+
+describe('handleEditTimeButton', () => {
+  test('shows the edit-time modal when the clicker is the creator', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '9/6 21:30' });
+    const interaction = {
+      customId: `edit-time:${event.id}`,
+      user: { id: 'creator-1' },
+      showModal: jest.fn(),
+      reply: jest.fn(async () => {}),
+    };
+
+    await handleEditTimeButton(interaction, db);
+
+    expect(interaction.showModal).toHaveBeenCalledTimes(1);
+    expect(interaction.showModal.mock.calls[0][0].data.custom_id).toBe(`edit-time-modal:${event.id}`);
+    expect(interaction.reply).not.toHaveBeenCalled();
+  });
+
+  test('replies ephemeral without showing the modal when the clicker is not the creator', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const interaction = {
+      customId: `edit-time:${event.id}`,
+      user: { id: 'someone-else' },
+      showModal: jest.fn(),
+      reply: jest.fn(async () => {}),
+    };
+
+    await handleEditTimeButton(interaction, db);
+
+    expect(interaction.showModal).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({ content: '只有團主能操作', ephemeral: true });
+  });
+
+  test('replies with an error when the event no longer exists', async () => {
+    const db = initDb(':memory:');
+    const interaction = {
+      customId: 'edit-time:999',
+      user: { id: 'creator-1' },
+      showModal: jest.fn(),
+      reply: jest.fn(async () => {}),
+    };
+
+    await handleEditTimeButton(interaction, db);
+
+    expect(interaction.showModal).not.toHaveBeenCalled();
+    expect(interaction.reply).toHaveBeenCalledWith({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true });
+  });
+});
+
+function makeEditTimeInteraction({ eventId, date, hour, minute, deferUpdateFails = false, channelsById = {} }) {
+  const selectValues = { event_date: date, event_hour: hour, event_minute: minute };
+  return {
+    customId: `edit-time-modal:${eventId}`,
+    fields: { getStringSelectValues: (id) => [selectValues[id]] },
+    deferUpdate: jest.fn(async () => {
+      if (deferUpdateFails) throw new Error('Unknown interaction');
+    }),
+    deleteReply: jest.fn(async () => {}),
+    followUp: jest.fn(async () => {}),
+    // Mirrors event-embed.test.js's makeClient: a channelsById entry that is
+    // an Error is thrown (simulating a deleted channel/thread), not returned.
+    client: {
+      channels: {
+        fetch: jest.fn(async (id) => {
+          const entry = channelsById[id];
+          if (entry instanceof Error) throw entry;
+          return entry;
+        }),
+      },
+    },
+  };
+}
+
+describe('handleEditTimeModal', () => {
+  test('updates start_time, resets reminded_at, refreshes both card copies, renames the thread, and notifies it', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    updateEventThreadId(db, event.id, 'thread-1');
+    updateEventThreadMessageId(db, event.id, 'thread-message-1');
+    markEventReminded(db, event.id, '2026-07-12T19:00:00.000Z');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const threadMessage = { edit: jest.fn(async () => {}) };
+    const thread = {
+      messages: { fetch: jest.fn(async () => threadMessage) },
+      setName: jest.fn(async () => {}),
+      send: jest.fn(async () => {}),
+    };
+    const interaction = makeEditTimeInteraction({
+      eventId: event.id,
+      date: '7/13',
+      hour: '21',
+      minute: '30',
+      channelsById: { 'channel-1': channel, 'thread-1': thread },
+    });
+
+    await handleEditTimeModal(interaction, db);
+
+    expect(getEventById(db, event.id)).toMatchObject({ start_time: '7/13 21:30', reminded_at: null });
+    expect(channelMessage.edit).toHaveBeenCalledTimes(1);
+    expect(threadMessage.edit).toHaveBeenCalledTimes(1);
+    expect(thread.setName).toHaveBeenCalledWith('7/13 21:30 週三夜間團 3場');
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('⏰ 開團時間已改為 7/13 21:30'),
+    }));
+    expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
+  });
+
+  test('rejects an invalid composed time without touching the event', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    const interaction = makeEditTimeInteraction({ eventId: event.id, date: '13/40', hour: '21', minute: '30' });
+
+    await handleEditTimeModal(interaction, db);
+
+    expect(getEventById(db, event.id).start_time).toBe('7/12 20:00');
+    expect(interaction.followUp).toHaveBeenCalledWith({
+      content: '時間格式錯誤，請重新點選「⏰ 改時間」設定',
+      ephemeral: true,
+    });
+  });
+
+  test('does nothing (but does not throw) when the event no longer exists', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeEditTimeInteraction({ eventId: 999, date: '7/13', hour: '21', minute: '30' });
+
+    await expect(handleEditTimeModal(interaction, db)).resolves.not.toThrow();
+    expect(interaction.followUp).toHaveBeenCalledWith({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true });
+  });
+
+  test('still updates the event and both card copies when the ack fails (stale interaction)', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    updateEventThreadId(db, event.id, 'thread-1');
+    updateEventThreadMessageId(db, event.id, 'thread-message-1');
+
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const threadMessage = { edit: jest.fn(async () => {}) };
+    const thread = {
+      messages: { fetch: jest.fn(async () => threadMessage) },
+      setName: jest.fn(async () => {}),
+      send: jest.fn(async () => {}),
+    };
+    const interaction = makeEditTimeInteraction({
+      eventId: event.id,
+      date: '7/13',
+      hour: '21',
+      minute: '30',
+      deferUpdateFails: true,
+      channelsById: { 'channel-1': channel, 'thread-1': thread },
+    });
+
+    await handleEditTimeModal(interaction, db);
+
+    expect(getEventById(db, event.id).start_time).toBe('7/13 21:30');
+    expect(interaction.followUp).not.toHaveBeenCalled();
+  });
+
+  test('still finishes updating the event when the thread was already deleted', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    updateEventThreadId(db, event.id, 'thread-1');
+
+    const channelMessage = { edit: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => channelMessage) } };
+    const unknownChannel = Object.assign(new Error('Unknown Channel'), { code: 10003 });
+    const interaction = makeEditTimeInteraction({
+      eventId: event.id,
+      date: '7/13',
+      hour: '21',
+      minute: '30',
+      channelsById: { 'channel-1': channel, 'thread-1': unknownChannel },
+    });
+
+    await expect(handleEditTimeModal(interaction, db)).resolves.not.toThrow();
+    expect(getEventById(db, event.id).start_time).toBe('7/13 21:30');
+    expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
   });
 });
