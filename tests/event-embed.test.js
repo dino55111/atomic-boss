@@ -222,6 +222,9 @@ describe('updateEventAnnouncement', () => {
     expect(client.channels.fetch).toHaveBeenCalledWith('thread-1');
     expect(thread.messages.fetch).toHaveBeenCalledWith('thread-message-1');
     expect(threadMessage.edit).toHaveBeenCalledTimes(1);
+    const threadPayload = threadMessage.edit.mock.calls[0][0];
+    expect(threadPayload.embeds).toHaveLength(0);
+    expect(threadPayload.components).toHaveLength(2);
   });
 
   test('skips the thread copy when the event has no thread_message_id (created before this feature)', async () => {

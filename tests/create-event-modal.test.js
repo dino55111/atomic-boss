@@ -67,9 +67,10 @@ describe('handleCreateEventModal', () => {
   });
 
   // Discord doesn't reliably let you click the buttons on a thread's starter
-  // message from within the thread itself, so a second, independently
-  // clickable copy of the same card is posted straight into the thread.
-  test('also posts a copy of the signup card into the new thread and stores its message id', async () => {
+  // message from within the thread itself, so an independently clickable
+  // copy of just the buttons (no embed card) is posted straight into the
+  // thread.
+  test('also posts the buttons (without the embed card) into the new thread and stores its message id', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉' });
 
@@ -77,7 +78,7 @@ describe('handleCreateEventModal', () => {
 
     expect(interaction.thread.send).toHaveBeenCalledTimes(1);
     const threadPayload = interaction.thread.send.mock.calls[0][0];
-    expect(threadPayload.embeds).toHaveLength(1);
+    expect(threadPayload.embeds).toBeUndefined();
     expect(threadPayload.components).toHaveLength(2);
 
     const event = getEventById(db, 1);

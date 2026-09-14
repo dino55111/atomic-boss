@@ -91,31 +91,35 @@ async function editIfPresent(fetchAndEdit) {
   }
 }
 
-// The signup card exists in two places: the main-channel announcement, and a
-// copy posted into the event's thread so its buttons work from inside the
-// thread too (Discord doesn't reliably let you click the buttons on a
-// thread's starter message from within the thread itself). An interaction
-// can come from either copy, so which channel triggered the update is not a
-// reliable way to find "the" announcement — both are always looked up by id
-// from the client instead, and updated independently so one being deleted
-// doesn't stop the other from staying in sync.
+// The signup card's embed lives in the main-channel announcement; the event's
+// thread only gets a copy of the buttons (no embed — the main channel copy
+// already shows it) so they're clickable from inside the thread too (Discord
+// doesn't reliably let you click the buttons on a thread's starter message
+// from within the thread itself). An interaction can come from either copy,
+// so which channel triggered the update is not a reliable way to find "the"
+// announcement — both are always looked up by id from the client instead,
+// and updated independently so one being deleted doesn't stop the other from
+// staying in sync.
 async function updateEventAnnouncement(client, event, signups) {
   const embed = buildEventEmbed(event, signups);
   const row = buildActionRow(event, signups.length);
   const managementRow = buildManagementRow(event.id);
-  const payload = { embeds: [embed], components: [row, managementRow] };
+  const channelPayload = { embeds: [embed], components: [row, managementRow] };
+  // embeds must be passed explicitly as [] here: Discord leaves a message's
+  // existing embeds untouched on edit unless the field is present.
+  const threadPayload = { embeds: [], components: [row, managementRow] };
 
   await editIfPresent(async () => {
     const channel = await client.channels.fetch(event.channel_id);
     const message = await channel.messages.fetch(event.message_id);
-    await message.edit(payload);
+    await message.edit(channelPayload);
   });
 
   if (event.thread_id && event.thread_message_id) {
     await editIfPresent(async () => {
       const thread = await client.channels.fetch(event.thread_id);
       const message = await thread.messages.fetch(event.thread_message_id);
-      await message.edit(payload);
+      await message.edit(threadPayload);
     });
   }
 }

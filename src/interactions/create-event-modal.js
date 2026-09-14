@@ -67,9 +67,10 @@ async function handleCreateEventModal(interaction, db) {
 
   // Discord doesn't reliably let you click the buttons on a thread's starter
   // message from within the thread itself (they work fine from the main
-  // channel) — see updateEventAnnouncement. Posting a second, independent
-  // copy of the card straight into the thread gives it working buttons too.
-  const threadMessage = await thread.send({ embeds: [embed], components: [row, managementRow] });
+  // channel) — see updateEventAnnouncement. Posting an independent copy of
+  // just the buttons (no embed — the main channel copy already shows it)
+  // straight into the thread gives it working buttons too.
+  const threadMessage = await thread.send({ components: [row, managementRow] });
   updateEventThreadMessageId(db, event.id, threadMessage.id);
 }
 
