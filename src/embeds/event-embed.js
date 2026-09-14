@@ -1,5 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { TITLE_NOTES } = require('../commands/create-event');
+const { TITLE_NOTES, TITLE_EMOJIS } = require('../commands/create-event');
 const { isAlreadyGoneError } = require('../discord-errors');
 
 function buildEventEmbed(event, signups) {
@@ -15,6 +15,8 @@ function buildEventEmbed(event, signups) {
         .join('\n');
 
   const notes = TITLE_NOTES[event.title];
+  const emoji = TITLE_EMOJIS[event.title];
+  const displayTitle = emoji ? `${emoji} ${event.title}` : event.title;
   const fields = [
     { name: '時間', value: event.start_time, inline: true },
     { name: '場次', value: `${event.session}場`, inline: true },
@@ -25,7 +27,7 @@ function buildEventEmbed(event, signups) {
   ];
 
   return new EmbedBuilder()
-    .setTitle(event.title)
+    .setTitle(displayTitle)
     .addFields(fields)
     .setColor(signups.length >= event.capacity ? 0xe74c3c : 0x2ecc71);
 }
