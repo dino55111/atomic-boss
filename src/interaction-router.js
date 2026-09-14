@@ -14,6 +14,11 @@ function createInteractionHandler({
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleEditTimeButton,
+  handleEditTimeModal,
+  handleCancelEventButton,
+  handleCancelEventConfirmButton,
+  handleCancelEventAbortButton,
 }) {
   return async function handleInteraction(interaction) {
     if (interaction.isChatInputCommand()) {
@@ -39,6 +44,10 @@ function createInteractionHandler({
       if (action === 'assist') await handleAssistButton(interaction);
       if (action === 'assist-external') await handleAssistExternalButton(interaction);
       if (action === 'assist-class-choice') await handleAssistClassChoiceButton(interaction);
+      if (action === 'edit-time') await handleEditTimeButton(interaction, db);
+      if (action === 'cancel-event') await handleCancelEventButton(interaction, db);
+      if (action === 'cancel-event-confirm') await handleCancelEventConfirmButton(interaction, db);
+      if (action === 'cancel-event-abort') await handleCancelEventAbortButton(interaction);
       return;
     }
 
@@ -53,6 +62,10 @@ function createInteractionHandler({
       }
       if (interaction.customId.startsWith('assist-join-modal:')) {
         await handleAssistJoinModal(interaction, db);
+        return;
+      }
+      if (interaction.customId.startsWith('edit-time-modal:')) {
+        await handleEditTimeModal(interaction, db);
       }
     }
   };

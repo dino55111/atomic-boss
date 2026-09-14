@@ -27,6 +27,11 @@ function makeHandlers(overrides = {}) {
     handleAssistExternalButton: jest.fn(),
     handleAssistClassChoiceButton: jest.fn(),
     handleAssistJoinModal: jest.fn(),
+    handleEditTimeButton: jest.fn(),
+    handleEditTimeModal: jest.fn(),
+    handleCancelEventButton: jest.fn(),
+    handleCancelEventConfirmButton: jest.fn(),
+    handleCancelEventAbortButton: jest.fn(),
     ...overrides,
   };
 }
@@ -177,5 +182,59 @@ describe('createInteractionHandler', () => {
     await handle(interaction);
 
     expect(handleAssistJoinModal).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes edit-time button clicks to handleEditTimeButton with the db', async () => {
+    const handleEditTimeButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleEditTimeButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'edit-time:1' });
+
+    await handle(interaction);
+
+    expect(handleEditTimeButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes cancel-event button clicks to handleCancelEventButton with the db', async () => {
+    const handleCancelEventButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleCancelEventButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'cancel-event:1' });
+
+    await handle(interaction);
+
+    expect(handleCancelEventButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes cancel-event-confirm button clicks to handleCancelEventConfirmButton with the db', async () => {
+    const handleCancelEventConfirmButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleCancelEventConfirmButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'cancel-event-confirm:1' });
+
+    await handle(interaction);
+
+    expect(handleCancelEventConfirmButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes cancel-event-abort button clicks to handleCancelEventAbortButton without the db', async () => {
+    const handleCancelEventAbortButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handleCancelEventAbortButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'cancel-event-abort' });
+
+    await handle(interaction);
+
+    expect(handleCancelEventAbortButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes edit-time-modal submissions to handleEditTimeModal with the db', async () => {
+    const handleEditTimeModal = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleEditTimeModal }));
+    const interaction = makeBaseInteraction({ isModalSubmit: () => true, customId: 'edit-time-modal:1' });
+
+    await handle(interaction);
+
+    expect(handleEditTimeModal).toHaveBeenCalledWith(interaction, db);
   });
 });
