@@ -53,4 +53,4 @@ async function checkAndCleanupEvents(client, db, now = new Date()) {
   }
 }
 
-module.exports = { checkAndCleanupEvents, CLEANUP_DELAY_MS, CLEANUP_POLL_INTERVAL_MS };
+module.exports = { checkAndCleanupEvents, deleteIfPresent, CLEANUP_DELAY_MS, CLEANUP_POLL_INTERVAL_MS };

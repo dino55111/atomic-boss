@@ -1,3 +1,4 @@
+const { ButtonStyle } = require('discord.js');
 const {
   initDb,
   getEventById,
@@ -6,12 +7,17 @@ const {
   updateEventThreadMessageId,
   addSignup,
   markEventReminded,
+  markEventCleaned,
 } = require('../src/db/db');
 const {
   requireCreator,
   buildEditTimeModal,
   handleEditTimeButton,
   handleEditTimeModal,
+  buildCancelConfirmRow,
+  handleCancelEventButton,
+  handleCancelEventConfirmButton,
+  handleCancelEventAbortButton,
 } = require('../src/interactions/manage-event');
 
 function makeEvent(db, overrides = {}) {
@@ -270,5 +276,142 @@ describe('handleEditTimeModal', () => {
     await expect(handleEditTimeModal(interaction, db)).resolves.not.toThrow();
     expect(getEventById(db, event.id).start_time).toBe('7/13 21:30');
     expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
+  });
+});
+
+describe('buildCancelConfirmRow', () => {
+  test('builds a confirm (Danger) and abort (Secondary) button pair scoped to the event', () => {
+    const row = buildCancelConfirmRow(42);
+    expect(row.components).toHaveLength(2);
+
+    const [confirm, abort] = row.components;
+    expect(confirm.data.custom_id).toBe('cancel-event-confirm:42');
+    expect(confirm.data.label).toBe('確定取消');
+    expect(confirm.data.style).toBe(ButtonStyle.Danger);
+
+    expect(abort.data.custom_id).toBe('cancel-event-abort');
+    expect(abort.data.label).toBe('算了');
+    expect(abort.data.style).toBe(ButtonStyle.Secondary);
+  });
+});
+
+describe('handleCancelEventButton', () => {
+  test('shows the confirm prompt when the clicker is the creator', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const interaction = { customId: `cancel-event:${event.id}`, user: { id: 'creator-1' }, reply: jest.fn(async () => {}) };
+
+    await handleCancelEventButton(interaction, db);
+
+    expect(interaction.reply).toHaveBeenCalledWith({
+      content: '確定要取消整個揪團嗎？此動作無法復原',
+      components: [expect.anything()],
+      ephemeral: true,
+    });
+    const payload = interaction.reply.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe(`cancel-event-confirm:${event.id}`);
+  });
+
+  test('replies ephemeral without a confirm prompt when the clicker is not the creator', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const interaction = { customId: `cancel-event:${event.id}`, user: { id: 'someone-else' }, reply: jest.fn(async () => {}) };
+
+    await handleCancelEventButton(interaction, db);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: '只有團主能操作', ephemeral: true });
+  });
+
+  test('replies with an error when the event no longer exists', async () => {
+    const db = initDb(':memory:');
+    const interaction = { customId: 'cancel-event:999', user: { id: 'creator-1' }, reply: jest.fn(async () => {}) };
+
+    await handleCancelEventButton(interaction, db);
+
+    expect(interaction.reply).toHaveBeenCalledWith({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true });
+  });
+});
+
+describe('handleCancelEventAbortButton', () => {
+  test('dismisses the confirmation prompt without touching anything else', async () => {
+    const interaction = { update: jest.fn(async () => {}) };
+
+    await handleCancelEventAbortButton(interaction);
+
+    expect(interaction.update).toHaveBeenCalledWith({ content: '已取消操作', components: [] });
+  });
+});
+
+describe('handleCancelEventConfirmButton', () => {
+  function makeCancelInteraction(eventId, channelsById = {}) {
+    return {
+      customId: `cancel-event-confirm:${eventId}`,
+      update: jest.fn(async () => {}),
+      client: { channels: { fetch: jest.fn(async (id) => channelsById[id]) } },
+    };
+  }
+
+  test('acks immediately, notifies the thread, deletes the announcement and thread, and marks the event cleaned', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '70', gameId: 'a#1' });
+
+    const message = { delete: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => message) } };
+    const thread = { send: jest.fn(async () => {}), delete: jest.fn(async () => {}) };
+    const interaction = makeCancelInteraction(event.id, { 'channel-1': channel, 'thread-1': thread });
+
+    await handleCancelEventConfirmButton(interaction, db);
+
+    expect(interaction.update).toHaveBeenCalledWith({ content: '正在取消揪團…', components: [] });
+    expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
+      content: expect.stringContaining('本次揪團已由團主取消'),
+    }));
+    expect(message.delete).toHaveBeenCalledTimes(1);
+    expect(thread.delete).toHaveBeenCalledTimes(1);
+
+    const updated = getEventById(db, event.id);
+    expect(updated.cleaned_at).not.toBeNull();
+    expect(updated.reminded_at).not.toBeNull();
+  });
+
+  test('does not overwrite an already-set reminded_at', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    markEventReminded(db, event.id, '2026-07-12T19:00:00.000Z');
+
+    const message = { delete: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => message) } };
+    const thread = { send: jest.fn(async () => {}), delete: jest.fn(async () => {}) };
+    const interaction = makeCancelInteraction(event.id, { 'channel-1': channel, 'thread-1': thread });
+
+    await handleCancelEventConfirmButton(interaction, db);
+
+    expect(getEventById(db, event.id).reminded_at).toBe('2026-07-12T19:00:00.000Z');
+  });
+
+  test('does nothing further (and does not throw) when the event no longer exists', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeCancelInteraction(999);
+
+    await expect(handleCancelEventConfirmButton(interaction, db)).resolves.not.toThrow();
+    expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
+  });
+
+  test('still marks the event cleaned when the announcement message was already deleted', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+
+    const unknownMessage = Object.assign(new Error('Unknown Message'), { code: 10008 });
+    const channel = { messages: { fetch: jest.fn(async () => { throw unknownMessage; }) } };
+    const thread = { send: jest.fn(async () => {}), delete: jest.fn(async () => {}) };
+    const interaction = makeCancelInteraction(event.id, { 'channel-1': channel, 'thread-1': thread });
+
+    await expect(handleCancelEventConfirmButton(interaction, db)).resolves.not.toThrow();
+    expect(thread.delete).toHaveBeenCalledTimes(1);
+    expect(getEventById(db, event.id).cleaned_at).not.toBeNull();
   });
 });
