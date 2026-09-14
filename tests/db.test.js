@@ -13,6 +13,7 @@ const {
   updateEventMessageId,
   updateEventThreadId,
   updateEventThreadMessageId,
+  updateEventStartTime,
   getEventsPendingReminder,
   markEventReminded,
   getEventsPendingCleanup,
@@ -434,6 +435,27 @@ describe('db', () => {
   test('migrateCleanupColumn is a no-op when the column already exists', () => {
     const db = makeTestDb();
     expect(() => migrateCleanupColumn(db)).not.toThrow();
+  });
+
+  test('updateEventStartTime updates start_time and resets reminded_at to null', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+    markEventReminded(db, event.id, '2026-07-12T19:00:00.000Z');
+
+    updateEventStartTime(db, event.id, '7/13 21:30');
+
+    const updated = getEventById(db, event.id);
+    expect(updated.start_time).toBe('7/13 21:30');
+    expect(updated.reminded_at).toBeNull();
+  });
+
+  test('updateEventStartTime leaves reminded_at null when it was already null', () => {
+    const db = makeTestDb();
+    const event = makeTestEvent(db);
+
+    updateEventStartTime(db, event.id, '7/13 21:30');
+
+    expect(getEventById(db, event.id).reminded_at).toBeNull();
   });
 
   test('getActiveEventsByGuild returns only events for that guild that have not been cleaned up', () => {

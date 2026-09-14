@@ -81,6 +81,10 @@ function updateEventThreadMessageId(db, eventId, threadMessageId) {
   db.prepare('UPDATE events SET thread_message_id = ? WHERE id = ?').run(threadMessageId, eventId);
 }
 
+function updateEventStartTime(db, eventId, startTime) {
+  db.prepare('UPDATE events SET start_time = ?, reminded_at = NULL WHERE id = ?').run(startTime, eventId);
+}
+
 function getActiveEventsByGuild(db, guildId) {
   return db.prepare('SELECT * FROM events WHERE guild_id = ? AND cleaned_at IS NULL ORDER BY id ASC').all(guildId);
 }
@@ -189,6 +193,7 @@ module.exports = {
   updateEventMessageId,
   updateEventThreadId,
   updateEventThreadMessageId,
+  updateEventStartTime,
   getEventsPendingReminder,
   markEventReminded,
   getEventsPendingCleanup,
