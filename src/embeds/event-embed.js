@@ -61,6 +61,20 @@ function buildActionRow(event, signupCount) {
   return new ActionRowBuilder().addComponents(signupButton, assistButton, cancelButton);
 }
 
+function buildManagementRow(eventId) {
+  const editTimeButton = new ButtonBuilder()
+    .setCustomId(`edit-time:${eventId}`)
+    .setLabel('⏰ 改時間')
+    .setStyle(ButtonStyle.Secondary);
+
+  const cancelEventButton = new ButtonBuilder()
+    .setCustomId(`cancel-event:${eventId}`)
+    .setLabel('🗑️ 取消揪團')
+    .setStyle(ButtonStyle.Danger);
+
+  return new ActionRowBuilder().addComponents(editTimeButton, cancelEventButton);
+}
+
 // The scheduled cleanup (or a human) can delete the announcement message
 // while its thread survives, leaving a stale signup card behind whose
 // buttons still look clickable. Fetching/editing it then 404s with Unknown
@@ -88,7 +102,8 @@ async function editIfPresent(fetchAndEdit) {
 async function updateEventAnnouncement(client, event, signups) {
   const embed = buildEventEmbed(event, signups);
   const row = buildActionRow(event, signups.length);
-  const payload = { embeds: [embed], components: [row] };
+  const managementRow = buildManagementRow(event.id);
+  const payload = { embeds: [embed], components: [row, managementRow] };
 
   await editIfPresent(async () => {
     const channel = await client.channels.fetch(event.channel_id);
@@ -105,4 +120,4 @@ async function updateEventAnnouncement(client, event, signups) {
   }
 }
 
-module.exports = { buildEventEmbed, buildActionRow, updateEventAnnouncement };
+module.exports = { buildEventEmbed, buildActionRow, buildManagementRow, updateEventAnnouncement };

@@ -1,4 +1,5 @@
-const { buildEventEmbed, buildActionRow, updateEventAnnouncement } = require('../src/embeds/event-embed');
+const { ButtonStyle } = require('discord.js');
+const { buildEventEmbed, buildActionRow, buildManagementRow, updateEventAnnouncement } = require('../src/embeds/event-embed');
 const { TITLE_NOTES, TITLE_EMOJIS, TITLE_COLORS } = require('../src/commands/create-event');
 
 const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
@@ -152,6 +153,22 @@ describe('buildActionRow', () => {
   });
 });
 
+describe('buildManagementRow', () => {
+  test('has an edit-time button (Secondary) and a cancel-event button (Danger), both scoped to the event id', () => {
+    const row = buildManagementRow(42);
+    expect(row.components).toHaveLength(2);
+
+    const [editTime, cancelEvent] = row.components;
+    expect(editTime.data.custom_id).toBe('edit-time:42');
+    expect(editTime.data.label).toBe('⏰ 改時間');
+    expect(editTime.data.style).toBe(ButtonStyle.Secondary);
+
+    expect(cancelEvent.data.custom_id).toBe('cancel-event:42');
+    expect(cancelEvent.data.label).toBe('🗑️ 取消揪團');
+    expect(cancelEvent.data.style).toBe(ButtonStyle.Danger);
+  });
+});
+
 // updateEventAnnouncement takes the client (not a single channel) because the
 // same card lives in two places: the main-channel announcement and its copy
 // posted into the event's thread. Which channel an interaction came from is
@@ -190,7 +207,7 @@ describe('updateEventAnnouncement', () => {
     expect(message.edit).toHaveBeenCalledTimes(1);
     const payload = message.edit.mock.calls[0][0];
     expect(payload.embeds).toHaveLength(1);
-    expect(payload.components).toHaveLength(1);
+    expect(payload.components).toHaveLength(2);
   });
 
   test('also fetches and edits the thread copy when the event has one', async () => {
