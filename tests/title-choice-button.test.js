@@ -4,6 +4,9 @@ const {
   handleTitleChoiceButton,
   handleSessionChoiceButton,
   SESSION_OPTIONS,
+  buildDateOptions,
+  HOUR_OPTIONS,
+  MINUTE_OPTIONS,
 } = require('../src/interactions/title-choice-button');
 
 describe('buildCreateEventModal', () => {
@@ -91,6 +94,14 @@ describe('buildSessionButtonRow', () => {
     const customIds = rows.flatMap((row) => row.components.map((button) => button.data.custom_id));
     expect(labels).toEqual(['1場', '2場', '3場', '4場', '5場', '6場', '7場']);
     expect(customIds).toEqual(SESSION_OPTIONS.map((session) => `session-choice:普拉:${session}`));
+  });
+});
+
+describe('reusable option builders (exported for the edit-time modal)', () => {
+  test('buildDateOptions, HOUR_OPTIONS, and MINUTE_OPTIONS are exported', () => {
+    expect(typeof buildDateOptions).toBe('function');
+    expect(HOUR_OPTIONS).toHaveLength(24);
+    expect(MINUTE_OPTIONS).toEqual(['00', '10', '20', '30', '40', '50']);
   });
 });
 

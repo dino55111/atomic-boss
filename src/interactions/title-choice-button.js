@@ -100,4 +100,7 @@ module.exports = {
   handleTitleChoiceButton,
   handleSessionChoiceButton,
   SESSION_OPTIONS,
+  buildDateOptions,
+  HOUR_OPTIONS,
+  MINUTE_OPTIONS,
 };
