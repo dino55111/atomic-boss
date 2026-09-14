@@ -1,5 +1,5 @@
 const { buildEventEmbed, buildActionRow, updateEventAnnouncement } = require('../src/embeds/event-embed');
-const { TITLE_NOTES, TITLE_EMOJIS } = require('../src/commands/create-event');
+const { TITLE_NOTES, TITLE_EMOJIS, TITLE_COLORS } = require('../src/commands/create-event');
 
 const baseEvent = { id: 1, title: '週三夜間團', capacity: 2, session: 3, start_time: '7/12 20:00', creator_id: 'creator-1' };
 
@@ -13,6 +13,31 @@ describe('buildEventEmbed', () => {
   test('leaves the title as-is when there is no configured emoji for it', () => {
     const embed = buildEventEmbed(baseEvent, []);
     expect(embed.data.title).toBe(baseEvent.title);
+  });
+
+  test('colors the embed with the matching title\'s color when there is room', () => {
+    const event = { ...baseEvent, title: '普拉', capacity: 2 };
+    const embed = buildEventEmbed(event, []);
+    expect(embed.data.color).toBe(TITLE_COLORS['普拉']);
+  });
+
+  test('falls back to the default green when there is no configured color for the title', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    expect(embed.data.color).toBe(0x2ecc71);
+  });
+
+  test('colors the embed grey when full, overriding the title color', () => {
+    const event = { ...baseEvent, title: '普拉', capacity: 1 };
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'a#1', note: '' }];
+    const embed = buildEventEmbed(event, signups);
+    expect(embed.data.color).toBe(0x7f8c8d);
+  });
+
+  test('colors the embed grey when full even with no configured title color', () => {
+    const event = { ...baseEvent, capacity: 1 };
+    const signups = [{ user_id: 'user-1', class: '戰士', level: '70', game_id: 'a#1', note: '' }];
+    const embed = buildEventEmbed(event, signups);
+    expect(embed.data.color).toBe(0x7f8c8d);
   });
 
   test('shows who opened the event', () => {

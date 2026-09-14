@@ -1,6 +1,9 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { TITLE_NOTES, TITLE_EMOJIS } = require('../commands/create-event');
+const { TITLE_NOTES, TITLE_EMOJIS, TITLE_COLORS } = require('../commands/create-event');
 const { isAlreadyGoneError } = require('../discord-errors');
+
+const DEFAULT_COLOR = 0x2ecc71;
+const FULL_COLOR = 0x7f8c8d;
 
 function buildEventEmbed(event, signups) {
   const roster = signups.length === 0
@@ -26,10 +29,13 @@ function buildEventEmbed(event, signups) {
     { name: '名單', value: roster },
   ];
 
+  const isFull = signups.length >= event.capacity;
+  const color = isFull ? FULL_COLOR : (TITLE_COLORS[event.title] ?? DEFAULT_COLOR);
+
   return new EmbedBuilder()
     .setTitle(displayTitle)
     .addFields(fields)
-    .setColor(signups.length >= event.capacity ? 0xe74c3c : 0x2ecc71);
+    .setColor(color);
 }
 
 function buildActionRow(event, signupCount) {

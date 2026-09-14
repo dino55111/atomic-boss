@@ -18,6 +18,14 @@ const TITLE_EMOJIS = {
   蝴蝶王: '🦋',
 };
 
+const TITLE_COLORS = {
+  普拉: 0xec7063,
+  困拉: 0x922b21,
+  普炎: 0xe67e22,
+  龍王: 0x1b4f72,
+  蝴蝶王: 0x16a085,
+};
+
 const TITLE_NOTES = {
   普拉: '拉圖進場須知：解前置\n自備物品：1D片、1雪、萬能藥、MP/HP藥水',
   普炎: '炎魔進場須知：無須前置\n自備物品：火之眼1顆(在包包內即可)、2雪、萬能藥、MP/HP藥水、櫻桃派(自行補雪)',
@@ -54,4 +62,4 @@ async function execute(interaction) {
   });
 }
 
-module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS, TITLE_NOTES };
+module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS, TITLE_NOTES, TITLE_COLORS };
