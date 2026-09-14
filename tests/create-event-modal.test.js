@@ -60,7 +60,7 @@ describe('handleCreateEventModal', () => {
     expect(interaction.channel.send).toHaveBeenCalledTimes(1);
     const sentPayload = interaction.channel.send.mock.calls[0][0];
     expect(sentPayload.embeds).toHaveLength(1);
-    expect(sentPayload.components).toHaveLength(1);
+    expect(sentPayload.components).toHaveLength(2);
 
     const event = getEventById(db, 1);
     expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'message-1', thread_id: 'thread-1' });
@@ -78,7 +78,7 @@ describe('handleCreateEventModal', () => {
     expect(interaction.thread.send).toHaveBeenCalledTimes(1);
     const threadPayload = interaction.thread.send.mock.calls[0][0];
     expect(threadPayload.embeds).toHaveLength(1);
-    expect(threadPayload.components).toHaveLength(1);
+    expect(threadPayload.components).toHaveLength(2);
 
     const event = getEventById(db, 1);
     expect(event.thread_message_id).toBe('thread-message-1');

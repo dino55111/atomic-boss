@@ -1,5 +1,5 @@
 const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
-const { buildEventEmbed, buildActionRow } = require('../embeds/event-embed');
+const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 
@@ -57,8 +57,9 @@ async function handleCreateEventModal(interaction, db) {
 
   const embed = buildEventEmbed(event, []);
   const row = buildActionRow(event, 0);
+  const managementRow = buildManagementRow(event.id);
 
-  const message = await interaction.channel.send({ embeds: [embed], components: [row] });
+  const message = await interaction.channel.send({ embeds: [embed], components: [row, managementRow] });
   updateEventMessageId(db, event.id, message.id);
 
   const thread = await message.startThread({ name: `${startTime} ${title} ${session}場`.slice(0, 100) });
@@ -68,7 +69,7 @@ async function handleCreateEventModal(interaction, db) {
   // message from within the thread itself (they work fine from the main
   // channel) — see updateEventAnnouncement. Posting a second, independent
   // copy of the card straight into the thread gives it working buttons too.
-  const threadMessage = await thread.send({ embeds: [embed], components: [row] });
+  const threadMessage = await thread.send({ embeds: [embed], components: [row, managementRow] });
   updateEventThreadMessageId(db, event.id, threadMessage.id);
 }
 
