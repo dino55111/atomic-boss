@@ -6,6 +6,7 @@ const TITLE_CAPACITIES = {
   困拉: 6,
   龍王: 12,
   蝴蝶王: 6,
+  樹王: 6,
 };
 
 const TITLE_OPTIONS = Object.keys(TITLE_CAPACITIES);
@@ -16,6 +17,7 @@ const TITLE_EMOJIS = {
   困拉: '⏰',
   龍王: '🐉',
   蝴蝶王: '🦋',
+  樹王: '🌳',
 };
 
 const TITLE_COLORS = {
@@ -24,6 +26,7 @@ const TITLE_COLORS = {
   普炎: 0xe67e22,
   龍王: 0x1b4f72,
   蝴蝶王: 0x16a085,
+  樹王: 0x1e8449,
 };
 
 const TITLE_NOTES = {
@@ -32,13 +35,16 @@ const TITLE_NOTES = {
   困拉: '困拉進場須知：需打過普通拉圖斯\n自備物品：3雪、萬能藥、MP/HP藥水、櫻桃派(自行補雪)',
   龍王: '龍王進場須知：解前置\n自備物品：變身密藥、萬能藥、MP/HP藥水、櫻桃派(自行補雪)',
   蝴蝶王: '艾畢奈亞進場須知：解前置\n自備物品：2雪、萬能藥、MP/HP藥水、櫻桃派(自行補雪)',
+  樹王: '樹王進場須知：解前置\n自備物品：2雪、萬能藥、MP/HP藥水、櫻桃派(自行補雪)',
 };
 
 const data = new SlashCommandBuilder()
   .setName('boss')
   .setDescription('建立一個新的揪團報名');
 
-function buildTitleButtonRow() {
+const BUTTONS_PER_ROW = 5;
+
+function buildTitleButtonRows() {
   const buttons = TITLE_OPTIONS.map((title) =>
     new ButtonBuilder()
       .setCustomId(`title-choice:${title}`)
@@ -46,7 +52,11 @@ function buildTitleButtonRow() {
       .setStyle(ButtonStyle.Secondary),
   );
 
-  return new ActionRowBuilder().addComponents(buttons);
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += BUTTONS_PER_ROW) {
+    rows.push(new ActionRowBuilder().addComponents(buttons.slice(i, i + BUTTONS_PER_ROW)));
+  }
+  return rows;
 }
 
 async function execute(interaction) {
@@ -57,9 +67,9 @@ async function execute(interaction) {
 
   await interaction.reply({
     content: '請選擇標題：',
-    components: [buildTitleButtonRow()],
+    components: buildTitleButtonRows(),
     ephemeral: true,
   });
 }
 
-module.exports = { data, execute, buildTitleButtonRow, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS, TITLE_NOTES, TITLE_COLORS };
+module.exports = { data, execute, buildTitleButtonRows, TITLE_OPTIONS, TITLE_CAPACITIES, TITLE_EMOJIS, TITLE_NOTES, TITLE_COLORS };

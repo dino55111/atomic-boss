@@ -1,7 +1,7 @@
 const {
   data,
   execute,
-  buildTitleButtonRow,
+  buildTitleButtonRows,
   TITLE_OPTIONS,
   TITLE_CAPACITIES,
   TITLE_EMOJIS,
@@ -20,8 +20,12 @@ describe('create-event command', () => {
     expect(interaction.reply).toHaveBeenCalledTimes(1);
     const replyPayload = interaction.reply.mock.calls[0][0];
     expect(replyPayload.ephemeral).toBe(true);
-    expect(replyPayload.components).toHaveLength(1);
-    expect(replyPayload.components[0].components).toHaveLength(TITLE_OPTIONS.length);
+    const totalButtons = replyPayload.components.reduce((sum, row) => sum + row.components.length, 0);
+    expect(totalButtons).toBe(TITLE_OPTIONS.length);
+    for (const row of replyPayload.components) {
+      expect(row.components.length).toBeGreaterThanOrEqual(1);
+      expect(row.components.length).toBeLessThanOrEqual(5);
+    }
   });
 
   test('execute refuses to start inside a thread and does not show the title-picker', async () => {
@@ -35,16 +39,23 @@ describe('create-event command', () => {
   });
 });
 
-describe('buildTitleButtonRow', () => {
+describe('buildTitleButtonRows', () => {
+  test('never puts more than 5 buttons in a single row (Discord action row limit)', () => {
+    const rows = buildTitleButtonRows();
+    for (const row of rows) {
+      expect(row.components.length).toBeLessThanOrEqual(5);
+    }
+  });
+
   test('lays out all title options as buttons with title-choice customIds', () => {
-    const row = buildTitleButtonRow();
-    const customIds = row.components.map((button) => button.data.custom_id);
+    const rows = buildTitleButtonRows();
+    const customIds = rows.flatMap((row) => row.components.map((button) => button.data.custom_id));
     expect(customIds).toEqual(TITLE_OPTIONS.map((title) => `title-choice:${title}`));
   });
 
   test('prefixes each button label with its emoji, but keeps the customId as the plain title', () => {
-    const row = buildTitleButtonRow();
-    const labels = row.components.map((button) => button.data.label);
+    const rows = buildTitleButtonRows();
+    const labels = rows.flatMap((row) => row.components.map((button) => button.data.label));
     expect(labels).toEqual(TITLE_OPTIONS.map((title) => `${TITLE_EMOJIS[title]} ${title}`));
   });
 });

@@ -1,0 +1,21 @@
+# Fly.io config for the TEST deployment (separate app/bot from
+# production). Deploy with: fly deploy --config fly.test.toml
+#
+# This uses its own app, volume, and Discord bot identity (BOT_TOKEN/
+# CLIENT_ID/GUILD_ID set via `fly secrets set --app atomic-boss-test`) so
+# testing never touches production's data or Discord server.
+app = "atomic-boss-test"
+primary_region = "nrt"
+
+[build]
+
+[env]
+  DB_PATH = "/data/data.db"
+
+[mounts]
+  source = "atomic_boss_test_data"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
