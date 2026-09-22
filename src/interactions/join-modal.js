@@ -17,6 +17,10 @@ function getOptionalTextInputValue(fields, customId) {
   return field ? field.value : '';
 }
 
+function isValidLevel(value) {
+  return /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 200;
+}
+
 async function handleJoinModal(interaction, db) {
   const [, eventIdRaw, className] = interaction.customId.split(':');
   const eventId = Number.parseInt(eventIdRaw, 10);
@@ -37,6 +41,13 @@ async function handleJoinModal(interaction, db) {
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
   const note = getOptionalTextInputValue(interaction.fields, 'note');
+
+  if (!isValidLevel(level)) {
+    if (acked) {
+      await interaction.followUp({ content: '等級請輸入 1~200 之間的數字', ephemeral: true });
+    }
+    return;
+  }
 
   const result = addSignup(db, event, {
     userId: interaction.user.id,
@@ -77,4 +88,4 @@ async function handleJoinModal(interaction, db) {
   });
 }
 
-module.exports = { handleJoinModal, getOptionalTextInputValue };
+module.exports = { handleJoinModal, getOptionalTextInputValue, isValidLevel };

@@ -1,5 +1,5 @@
 const { initDb, createEvent, updateEventThreadId, getSignups, addSignup } = require('../src/db/db');
-const { handleJoinModal, getOptionalTextInputValue } = require('../src/interactions/join-modal');
+const { handleJoinModal, getOptionalTextInputValue, isValidLevel } = require('../src/interactions/join-modal');
 
 function makeEvent(db, overrides = {}) {
   const event = createEvent(db, {
@@ -224,6 +224,47 @@ describe('handleJoinModal', () => {
 
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ ephemeral: true }));
+  });
+
+  test('rejects and does not record the signup when the level is outside 1~200', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 2 });
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeInteraction({
+      eventId: event.id,
+      className: '冰雷',
+      userId: 'user-1',
+      fieldValues: { level: '201', game_id: 'alice#1' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleJoinModal(interaction, db);
+
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '等級請輸入 1~200 之間的數字', ephemeral: true }),
+    );
+    expect(getSignups(db, event.id)).toHaveLength(0);
+    expect(editedMessage.edit).not.toHaveBeenCalled();
+    expect(thread.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('isValidLevel', () => {
+  test('accepts whole numbers from 1 to 200', () => {
+    expect(isValidLevel('1')).toBe(true);
+    expect(isValidLevel('70')).toBe(true);
+    expect(isValidLevel('200')).toBe(true);
+  });
+
+  test('rejects 0, negatives, over 200, decimals, and non-numeric input', () => {
+    expect(isValidLevel('0')).toBe(false);
+    expect(isValidLevel('201')).toBe(false);
+    expect(isValidLevel('-5')).toBe(false);
+    expect(isValidLevel('7.5')).toBe(false);
+    expect(isValidLevel('abc')).toBe(false);
+    expect(isValidLevel('')).toBe(false);
   });
 });
 

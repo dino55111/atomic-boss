@@ -40,6 +40,7 @@ describe('buildAssistJoinModal', () => {
     expect(modal.data.custom_id).toBe('assist-join-modal:42:user-9:冰雷');
     expect(modal.components).toHaveLength(3);
     expect(modal.components[0].components[0].data.label).toBe('等級');
+    expect(modal.components[0].components[0].data.max_length).toBe(3);
   });
 
   test('has an extra 暱稱 field first when assisting a non-Discord friend', () => {
@@ -304,6 +305,29 @@ describe('handleAssistJoinModal', () => {
     await handleAssistJoinModal(interaction, db);
 
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({ content: '已經額滿了', ephemeral: true }));
+  });
+
+  test('rejects and does not record the signup when the level is outside 1~200', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '0', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.followUp).toHaveBeenCalledWith(
+      expect.objectContaining({ content: '等級請輸入 1~200 之間的數字', ephemeral: true }),
+    );
+    expect(getSignups(db, event.id)).toHaveLength(0);
+    expect(thread.send).not.toHaveBeenCalled();
   });
 
   test('silently does nothing when the target has already signed up', async () => {

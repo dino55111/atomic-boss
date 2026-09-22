@@ -71,6 +71,7 @@ function buildJoinDetailsModal(eventId, className) {
     .setCustomId('level')
     .setLabel('等級')
     .setStyle(TextInputStyle.Short)
+    .setMaxLength(3)
     .setRequired(true);
 
   const gameIdInput = new TextInputBuilder()

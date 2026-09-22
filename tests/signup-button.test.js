@@ -78,6 +78,7 @@ describe('buildJoinDetailsModal', () => {
     expect(modal.data.title).toBe('報名揪團（冰雷）');
     expect(modal.components).toHaveLength(3);
     expect(modal.components[0].components[0].data.label).toBe('等級');
+    expect(modal.components[0].components[0].data.max_length).toBe(3);
     expect(modal.components[1].components[0].data.label).toBe('遊戲 ID');
   });
 

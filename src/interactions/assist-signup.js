@@ -11,7 +11,7 @@ const {
 const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
 const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
-const { getOptionalTextInputValue } = require('./join-modal');
+const { getOptionalTextInputValue, isValidLevel } = require('./join-modal');
 const { buildClassButtonRowsForCustomIds } = require('./signup-button');
 
 const EXTERNAL_TARGET = 'external';
@@ -59,7 +59,7 @@ function buildAssistJoinModal(eventId, target, className) {
     .setCustomId('level')
     .setLabel('等級')
     .setStyle(TextInputStyle.Short)
-    .setMaxLength(32)
+    .setMaxLength(3)
     .setRequired(true);
 
   const gameIdInput = new TextInputBuilder()
@@ -151,6 +151,13 @@ async function handleAssistJoinModal(interaction, db) {
   const level = interaction.fields.getTextInputValue('level');
   const gameId = interaction.fields.getTextInputValue('game_id');
   const note = getOptionalTextInputValue(interaction.fields, 'note');
+
+  if (!isValidLevel(level)) {
+    if (acked) {
+      await interaction.followUp({ content: '等級請輸入 1~200 之間的數字', ephemeral: true });
+    }
+    return;
+  }
 
   const isExternal = target === EXTERNAL_TARGET;
   const userId = isExternal ? generateExternalUserId() : target;
