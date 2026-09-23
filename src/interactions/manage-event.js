@@ -8,7 +8,7 @@ const {
 } = require('discord.js');
 const { getEventById, getSignups, updateEventStartTime, markEventCleaned, markEventReminded } = require('../db/db');
 const { updateEventAnnouncement } = require('../embeds/event-embed');
-const { isValidStartTime } = require('./create-event-modal');
+const { isValidStartTime, isFutureStartTime } = require('./create-event-modal');
 const { buildDateOptions, HOUR_OPTIONS, MINUTE_OPTIONS } = require('./title-choice-button');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { buildMentionSegment } = require('../reminders');
@@ -106,7 +106,7 @@ async function notifyThreadOfNewTime(client, event, startTime, signups) {
   }
 }
 
-async function handleEditTimeModal(interaction, db) {
+async function handleEditTimeModal(interaction, db, now = new Date()) {
   const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
   const date = interaction.fields.getStringSelectValues('event_date')[0];
   const hour = interaction.fields.getStringSelectValues('event_hour')[0];
@@ -121,6 +121,13 @@ async function handleEditTimeModal(interaction, db) {
   if (!isValidStartTime(startTime)) {
     if (acked) {
       await interaction.followUp({ content: '時間格式錯誤，請重新點選「⏰ 改時間」設定', ephemeral: true });
+    }
+    return;
+  }
+
+  if (!isFutureStartTime(startTime, now)) {
+    if (acked) {
+      await interaction.followUp({ content: '所選時間已經過去，請重新點選「⏰ 改時間」選擇之後的時間', ephemeral: true });
     }
     return;
   }

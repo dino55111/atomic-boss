@@ -2,8 +2,7 @@ const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThrea
 const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
-
-const START_TIME_PATTERN = /^(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2})$/;
+const { START_TIME_PATTERN, resolveStartDateTime } = require('../start-time');
 
 function isValidStartTime(rawStartTime) {
   const match = START_TIME_PATTERN.exec(rawStartTime);
@@ -19,7 +18,12 @@ function isValidStartTime(rawStartTime) {
   return month >= 1 && month <= 12 && day >= 1 && day <= 31 && hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59;
 }
 
-async function handleCreateEventModal(interaction, db) {
+function isFutureStartTime(rawStartTime, now = new Date()) {
+  const candidate = resolveStartDateTime(rawStartTime, now);
+  return candidate !== null && candidate.getTime() > now.getTime();
+}
+
+async function handleCreateEventModal(interaction, db, now = new Date()) {
   const [, title, sessionRaw] = interaction.customId.split(':');
   const session = Number.parseInt(sessionRaw, 10);
   const date = interaction.fields.getStringSelectValues('event_date')[0];
@@ -38,6 +42,16 @@ async function handleCreateEventModal(interaction, db) {
     if (acked) {
       await interaction.followUp({
         content: '時間格式錯誤，請用「月/日 時:分」的格式重新使用 /boss 建立，例如 7/12 20:00',
+        ephemeral: true,
+      });
+    }
+    return;
+  }
+
+  if (!isFutureStartTime(startTime, now)) {
+    if (acked) {
+      await interaction.followUp({
+        content: '所選時間已經過去，請選擇現在之後的時間重新使用 /boss 建立',
         ephemeral: true,
       });
     }
@@ -74,4 +88,4 @@ async function handleCreateEventModal(interaction, db) {
   updateEventThreadMessageId(db, event.id, threadMessage.id);
 }
 
-module.exports = { handleCreateEventModal, isValidStartTime };
+module.exports = { handleCreateEventModal, isValidStartTime, isFutureStartTime };

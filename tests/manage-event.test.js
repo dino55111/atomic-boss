@@ -170,6 +170,11 @@ function makeEditTimeInteraction({ eventId, date, hour, minute, deferUpdateFails
 }
 
 describe('handleEditTimeModal', () => {
+  // The fixture dates below (7/12, 7/13, ...) are meant to read as "some
+  // time after now" — fixed well before any of them so isFutureStartTime
+  // doesn't reject them as the real wall clock moves past those dates.
+  const FIXED_NOW = new Date(2026, 0, 1, 0, 0);
+
   test('updates start_time, resets reminded_at, refreshes both card copies, renames the thread, and notifies it', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { startTime: '7/12 20:00' });
@@ -194,7 +199,7 @@ describe('handleEditTimeModal', () => {
       channelsById: { 'channel-1': channel, 'thread-1': thread },
     });
 
-    await handleEditTimeModal(interaction, db);
+    await handleEditTimeModal(interaction, db, FIXED_NOW);
 
     expect(getEventById(db, event.id)).toMatchObject({ start_time: '7/13 21:30', reminded_at: null });
     expect(channelMessage.edit).toHaveBeenCalledTimes(1);
@@ -211,7 +216,7 @@ describe('handleEditTimeModal', () => {
     const event = makeEvent(db, { startTime: '7/12 20:00' });
     const interaction = makeEditTimeInteraction({ eventId: event.id, date: '13/40', hour: '21', minute: '30' });
 
-    await handleEditTimeModal(interaction, db);
+    await handleEditTimeModal(interaction, db, FIXED_NOW);
 
     expect(getEventById(db, event.id).start_time).toBe('7/12 20:00');
     expect(interaction.followUp).toHaveBeenCalledWith({
@@ -220,11 +225,26 @@ describe('handleEditTimeModal', () => {
     });
   });
 
+  test('rejects a past-today time without touching the event', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    const now = new Date(2026, 8, 23, 22, 0); // Sep 23 2026, 22:00
+    const interaction = makeEditTimeInteraction({ eventId: event.id, date: '9/23', hour: '20', minute: '00' });
+
+    await handleEditTimeModal(interaction, db, now);
+
+    expect(getEventById(db, event.id).start_time).toBe('7/12 20:00');
+    expect(interaction.followUp).toHaveBeenCalledWith({
+      content: '所選時間已經過去，請重新點選「⏰ 改時間」選擇之後的時間',
+      ephemeral: true,
+    });
+  });
+
   test('does nothing (but does not throw) when the event no longer exists', async () => {
     const db = initDb(':memory:');
     const interaction = makeEditTimeInteraction({ eventId: 999, date: '7/13', hour: '21', minute: '30' });
 
-    await expect(handleEditTimeModal(interaction, db)).resolves.not.toThrow();
+    await expect(handleEditTimeModal(interaction, db, FIXED_NOW)).resolves.not.toThrow();
     expect(interaction.followUp).toHaveBeenCalledWith({ content: '找不到這個揪團，可能已經被刪除了', ephemeral: true });
   });
 
@@ -251,7 +271,7 @@ describe('handleEditTimeModal', () => {
       channelsById: { 'channel-1': channel, 'thread-1': thread },
     });
 
-    await handleEditTimeModal(interaction, db);
+    await handleEditTimeModal(interaction, db, FIXED_NOW);
 
     expect(getEventById(db, event.id).start_time).toBe('7/13 21:30');
     expect(interaction.followUp).not.toHaveBeenCalled();
@@ -273,7 +293,7 @@ describe('handleEditTimeModal', () => {
       channelsById: { 'channel-1': channel, 'thread-1': unknownChannel },
     });
 
-    await expect(handleEditTimeModal(interaction, db)).resolves.not.toThrow();
+    await expect(handleEditTimeModal(interaction, db, FIXED_NOW)).resolves.not.toThrow();
     expect(getEventById(db, event.id).start_time).toBe('7/13 21:30');
     expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
   });
