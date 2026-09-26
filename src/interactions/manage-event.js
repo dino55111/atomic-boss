@@ -10,7 +10,7 @@ const { getEventById, getSignups, updateEventStartTime, markEventCleaned, markEv
 const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { isValidStartTime, isFutureStartTime } = require('./create-event-modal');
 const { buildDateOptions, HOUR_OPTIONS, MINUTE_OPTIONS } = require('./title-choice-button');
-const { tryAcknowledgeAndDeleteReply } = require('./ack');
+const { tryAcknowledgeKeepMessage } = require('./ack');
 const { buildMentionSegment } = require('../reminders');
 const { deleteIfPresent } = require('../cleanup');
 const { isAlreadyGoneError } = require('../discord-errors');
@@ -116,7 +116,7 @@ async function handleEditTimeModal(interaction, db, now = new Date()) {
   // Multiple slow steps follow (DB write, two message edits, thread rename,
   // thread notification) — ack immediately so none of that races Discord's
   // 3-second interaction window, same reasoning as handleCreateEventModal.
-  const acked = await tryAcknowledgeAndDeleteReply(interaction);
+  const acked = await tryAcknowledgeKeepMessage(interaction);
 
   if (!isValidStartTime(startTime)) {
     if (acked) {

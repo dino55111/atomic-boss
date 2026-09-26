@@ -211,6 +211,24 @@ describe('handleEditTimeModal', () => {
     expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
   });
 
+  test('acks without deleting the reply, since the reply is the public card itself', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { startTime: '7/12 20:00' });
+    const channel = { messages: { fetch: jest.fn(async () => ({ edit: jest.fn(async () => {}) })) } };
+    const interaction = makeEditTimeInteraction({
+      eventId: event.id,
+      date: '7/13',
+      hour: '21',
+      minute: '30',
+      channelsById: { 'channel-1': channel },
+    });
+
+    await handleEditTimeModal(interaction, db, FIXED_NOW);
+
+    expect(interaction.deferUpdate).toHaveBeenCalled();
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+  });
+
   test('rejects an invalid composed time without touching the event', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { startTime: '7/12 20:00' });

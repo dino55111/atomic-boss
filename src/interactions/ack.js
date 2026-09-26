@@ -13,4 +13,16 @@ async function tryAcknowledgeAndDeleteReply(interaction) {
   }
 }
 
-module.exports = { tryAcknowledgeAndDeleteReply };
+// For modals opened straight from a public message's button (e.g. the card's
+// "改時間"): the interaction's reply IS that message, so deleteReply() would
+// delete the card itself. Only ack, leaving the message untouched.
+async function tryAcknowledgeKeepMessage(interaction) {
+  try {
+    await interaction.deferUpdate();
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+module.exports = { tryAcknowledgeAndDeleteReply, tryAcknowledgeKeepMessage };
