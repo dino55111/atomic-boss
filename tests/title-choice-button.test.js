@@ -83,16 +83,16 @@ describe('buildCreateEventModal', () => {
 });
 
 describe('buildSessionButtonRow', () => {
-  test('lays out sessions 1~7 as buttons across 2 rows with session-choice customIds', () => {
+  test('lays out sessions 1~7 and 14 as buttons across 2 rows with session-choice customIds', () => {
     const rows = buildSessionButtonRow('普拉');
-    expect(SESSION_OPTIONS).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(SESSION_OPTIONS).toEqual([1, 2, 3, 4, 5, 6, 7, 14]);
     expect(rows).toHaveLength(2);
     expect(rows[0].components).toHaveLength(5);
-    expect(rows[1].components).toHaveLength(2);
+    expect(rows[1].components).toHaveLength(3);
 
     const labels = rows.flatMap((row) => row.components.map((button) => button.data.label));
     const customIds = rows.flatMap((row) => row.components.map((button) => button.data.custom_id));
-    expect(labels).toEqual(['1場', '2場', '3場', '4場', '5場', '6場', '7場']);
+    expect(labels).toEqual(['1場', '2場', '3場', '4場', '5場', '6場', '7場', '14場']);
     expect(customIds).toEqual(SESSION_OPTIONS.map((session) => `session-choice:普拉:${session}`));
   });
 });
