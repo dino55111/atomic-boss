@@ -364,6 +364,58 @@ describe('handleCancelButton with multiple cancellable signups', () => {
     expect(payload.components[0].components).toHaveLength(2);
   });
 
+  test('labels each candidate button with their current server nickname', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'helper-1', displayName: 'Helper', className: '戰士', level: '70', gameId: 'h#1' });
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1',
+      addedByUserId: 'helper-1', isExternal: true,
+    });
+
+    const guild = {
+      members: {
+        fetch: jest.fn(async (userId) => (userId === 'helper-1' ? { displayName: '小幫手暱稱' } : null)),
+      },
+    };
+    const interaction = {
+      customId: `cancel:${event.id}`, user: { id: 'helper-1' }, guild, reply: jest.fn(async () => {}),
+    };
+
+    await handleCancelButton(interaction, db);
+
+    const payload = interaction.reply.mock.calls[0][0];
+    const labels = payload.components.flatMap((row) => row.components.map((button) => button.data.label));
+    // The real user's button shows their guild nickname, not the stored
+    // signup name; the external signup has no guild identity so it keeps
+    // showing the name it was added with.
+    expect(labels).toContain('小幫手暱稱（戰士）');
+    expect(labels).toContain('小明（法師）');
+  });
+
+  test('falls back to the stored signup name when the member can no longer be resolved', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db, { capacity: 5 });
+    updateEventThreadId(db, event.id, 'thread-1');
+    addSignup(db, event, { userId: 'helper-1', displayName: 'Helper', className: '戰士', level: '70', gameId: 'h#1' });
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1',
+      addedByUserId: 'helper-1', isExternal: true,
+    });
+
+    const guild = { members: { fetch: jest.fn(async () => { throw new Error('Unknown Member'); }) } };
+    const interaction = {
+      customId: `cancel:${event.id}`, user: { id: 'helper-1' }, guild, reply: jest.fn(async () => {}),
+    };
+
+    await handleCancelButton(interaction, db);
+
+    const payload = interaction.reply.mock.calls[0][0];
+    const labels = payload.components.flatMap((row) => row.components.map((button) => button.data.label));
+    expect(labels).toContain('Helper（戰士）');
+  });
+
   test('the event creator can cancel an external signup added by someone else', async () => {
     const db = initDb(':memory:');
     const event = makeEvent(db, { capacity: 5, creatorId: 'creator-1' });

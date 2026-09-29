@@ -128,13 +128,26 @@ function findCancellableSignups(signups, event, userId) {
   return candidates;
 }
 
-function buildCancelChoiceRows(eventId, candidates) {
-  const buttons = candidates.map((signup) =>
-    new ButtonBuilder()
+// External signups have no Discord account, so there's no server nickname
+// to look up - keep showing the name they were added with. Real signups
+// show the clicker's *current* nickname in this server rather than the
+// username snapshotted at signup time, falling back to that snapshot when
+// the member can't be resolved (e.g. they've since left, or no guild is
+// available at all).
+async function resolveCancelButtonName(signup, guild) {
+  if (signup.is_external || !guild) return signup.display_name;
+  const member = await guild.members.fetch(signup.user_id).catch(() => null);
+  return member ? member.displayName : signup.display_name;
+}
+
+async function buildCancelChoiceRows(eventId, candidates, guild) {
+  const buttons = await Promise.all(candidates.map(async (signup) => {
+    const name = await resolveCancelButtonName(signup, guild);
+    return new ButtonBuilder()
       .setCustomId(`cancel-select:${eventId}:${signup.id}`)
-      .setLabel(`${signup.display_name}（${signup.class}）`.slice(0, 80))
-      .setStyle(ButtonStyle.Secondary),
-  );
+      .setLabel(`${name}（${signup.class}）`.slice(0, 80))
+      .setStyle(ButtonStyle.Secondary);
+  }));
 
   const rows = [];
   for (let i = 0; i < buttons.length; i += CANCEL_BUTTONS_PER_ROW) {
@@ -190,7 +203,7 @@ async function handleCancelButton(interaction, db) {
   if (candidates.length > 1) {
     await interaction.reply({
       content: '請選擇要取消哪一筆報名：',
-      components: buildCancelChoiceRows(event.id, candidates),
+      components: await buildCancelChoiceRows(event.id, candidates, interaction.guild),
       ephemeral: true,
     });
     return;
