@@ -204,9 +204,10 @@ describe('handleEditTimeModal', () => {
     expect(getEventById(db, event.id)).toMatchObject({ start_time: '7/13 21:30', reminded_at: null });
     expect(channelMessage.edit).toHaveBeenCalledTimes(1);
     expect(threadMessage.edit).toHaveBeenCalledTimes(1);
-    expect(thread.setName).toHaveBeenCalledWith('7/13 21:30 週三夜間團 3場');
+    // 2026-07-13 is a Monday.
+    expect(thread.setName).toHaveBeenCalledWith('7/13 (一) 21:30 週三夜間團 3場');
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
-      content: expect.stringContaining('⏰ 開團時間已改為 7/13 21:30'),
+      content: expect.stringContaining('⏰ 開團時間已改為 7/13 (一) 21:30'),
     }));
     expect(interaction.followUp).toHaveBeenCalledWith({ content: '已更新時間', ephemeral: true });
   });

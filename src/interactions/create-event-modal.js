@@ -2,7 +2,7 @@ const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThrea
 const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
-const { START_TIME_PATTERN, resolveStartDateTime } = require('../start-time');
+const { START_TIME_PATTERN, resolveStartDateTime, formatStartTimeWithWeekday } = require('../start-time');
 
 function isValidStartTime(rawStartTime) {
   const match = START_TIME_PATTERN.exec(rawStartTime);
@@ -76,7 +76,9 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
   const message = await interaction.channel.send({ embeds: [embed], components: [row, managementRow] });
   updateEventMessageId(db, event.id, message.id);
 
-  const thread = await message.startThread({ name: `${startTime} ${title} ${session}場`.slice(0, 100) });
+  const thread = await message.startThread({
+    name: `${formatStartTimeWithWeekday(startTime, now)} ${title} ${session}場`.slice(0, 100),
+  });
   updateEventThreadId(db, event.id, thread.id);
 
   // Discord doesn't reliably let you click the buttons on a thread's starter

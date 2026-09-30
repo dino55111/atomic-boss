@@ -14,6 +14,7 @@ const { tryAcknowledgeKeepMessage } = require('./ack');
 const { buildMentionSegment } = require('../reminders');
 const { deleteIfPresent } = require('../cleanup');
 const { isAlreadyGoneError } = require('../discord-errors');
+const { formatStartTimeWithWeekday } = require('../start-time');
 
 const NOT_FOUND_MESSAGE = '找不到這個揪團，可能已經被刪除了';
 
@@ -88,17 +89,18 @@ async function handleEditTimeButton(interaction, db) {
   await interaction.showModal(buildEditTimeModal(event.id, event.start_time));
 }
 
-async function notifyThreadOfNewTime(client, event, startTime, signups) {
+async function notifyThreadOfNewTime(client, event, startTime, signups, now) {
   if (!event.thread_id) return;
 
   try {
     const thread = await client.channels.fetch(event.thread_id);
-    await thread.setName(`${startTime} ${event.title} ${event.session}場`.slice(0, 100));
+    const displayStartTime = formatStartTimeWithWeekday(startTime, now);
+    await thread.setName(`${displayStartTime} ${event.title} ${event.session}場`.slice(0, 100));
 
     const mentions = signups.map(buildMentionSegment).join(' ');
     const mentionableUserIds = signups.filter((s) => !s.is_external).map((s) => s.user_id);
     await thread.send({
-      content: `⏰ 開團時間已改為 ${startTime}，已報名的人請留意：${mentions || '（目前尚無人報名）'}`,
+      content: `⏰ 開團時間已改為 ${displayStartTime}，已報名的人請留意：${mentions || '（目前尚無人報名）'}`,
       allowedMentions: { users: mentionableUserIds },
     });
   } catch (error) {
@@ -145,7 +147,7 @@ async function handleEditTimeModal(interaction, db, now = new Date()) {
   const signups = getSignups(db, event.id);
 
   await updateEventAnnouncement(interaction.client, updatedEvent, signups);
-  await notifyThreadOfNewTime(interaction.client, event, startTime, signups);
+  await notifyThreadOfNewTime(interaction.client, event, startTime, signups, now);
 
   if (acked) {
     await interaction.followUp({ content: '已更新時間', ephemeral: true });

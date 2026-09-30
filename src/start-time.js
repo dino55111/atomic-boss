@@ -1,5 +1,6 @@
 const START_TIME_PATTERN = /^(\d{1,2})\/(\d{1,2}) (\d{1,2}):(\d{2})$/;
 const ROLLOVER_THRESHOLD_MS = 180 * 24 * 60 * 60 * 1000;
+const WEEKDAY_CHARS = ['日', '一', '二', '三', '四', '五', '六'];
 
 // start_time is stored as "M/D HH:mm" with no year. To compare it against a
 // reference Date, resolve the missing year: try the reference's year first,
@@ -27,4 +28,19 @@ function resolveStartDateTime(rawStartTime, reference) {
   return candidate;
 }
 
-module.exports = { START_TIME_PATTERN, resolveStartDateTime };
+// Renders a stored "M/D HH:mm" start time with its weekday inserted, e.g.
+// "7/12 (日) 20:00" — matching the weekday already shown on the date-picker
+// options in title-choice-button.js. Falls back to the raw string if it
+// doesn't resolve to a valid date (defensive; callers only pass start times
+// that already passed isValidStartTime).
+function formatStartTimeWithWeekday(startTime, now) {
+  const resolved = resolveStartDateTime(startTime, now);
+  if (!resolved) {
+    return startTime;
+  }
+
+  const [date, time] = startTime.split(' ');
+  return `${date} (${WEEKDAY_CHARS[resolved.getDay()]}) ${time}`;
+}
+
+module.exports = { START_TIME_PATTERN, WEEKDAY_CHARS, resolveStartDateTime, formatStartTimeWithWeekday };

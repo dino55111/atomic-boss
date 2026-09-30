@@ -110,13 +110,14 @@ describe('handleCreateEventModal', () => {
     expect(event.thread_message_id).toBe('thread-message-1');
   });
 
-  test('thread name is prefixed with the composed 日期 時:分 and suffixed with the chosen session', async () => {
+  test('thread name is prefixed with the composed 日期 (星期幾) 時:分 and suffixed with the chosen session', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉', session: 3, date: '7/12', hour: '20', minute: '00' });
 
     await handleCreateEventModal(interaction, db, FIXED_NOW);
 
-    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 20:00 普拉 3場' });
+    // 2026-07-12 is a Sunday.
+    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 (日) 20:00 普拉 3場' });
   });
 
   test('composes the start time from the date, hour, and minute selects', async () => {

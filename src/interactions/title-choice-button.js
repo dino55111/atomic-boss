@@ -6,12 +6,12 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
+const { WEEKDAY_CHARS } = require('../start-time');
 
 const SESSION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 14];
 const SESSION_BUTTONS_PER_ROW = 5;
 
 const DATE_OPTIONS_COUNT = 7;
-const WEEKDAY_CHARS = ['日', '一', '二', '三', '四', '五', '六'];
 const DEFAULT_HOUR = '20';
 const DEFAULT_MINUTE = '00';
 const MINUTE_OPTIONS = ['00', '10', '20', '30', '40', '50'];
