@@ -60,6 +60,27 @@ describe('buildEventEmbed', () => {
     expect(notesField).toBeUndefined();
   });
 
+  test('shows the 職業搭配建議 field when the current roster is missing a recommended class', () => {
+    const event = { ...baseEvent, title: '普拉' };
+    const embed = buildEventEmbed(event, []);
+    const comboField = embed.data.fields.find((f) => f.name === '職業搭配建議');
+    expect(comboField.value).toBe('還缺：法師 1 位');
+  });
+
+  test('omits the 職業搭配建議 field once the roster meets the recommendation', () => {
+    const event = { ...baseEvent, title: '普拉' };
+    const signups = [{ user_id: 'user-1', class: '主教', level: '70', game_id: 'a#1', note: '' }];
+    const embed = buildEventEmbed(event, signups);
+    const comboField = embed.data.fields.find((f) => f.name === '職業搭配建議');
+    expect(comboField).toBeUndefined();
+  });
+
+  test('omits the 職業搭配建議 field for a title with no configured combo rules', () => {
+    const embed = buildEventEmbed(baseEvent, []);
+    const comboField = embed.data.fields.find((f) => f.name === '職業搭配建議');
+    expect(comboField).toBeUndefined();
+  });
+
   test('shows the session field', () => {
     const embed = buildEventEmbed(baseEvent, []);
     const sessionField = embed.data.fields.find((f) => f.name === '場次');

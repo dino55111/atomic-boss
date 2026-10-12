@@ -1,5 +1,6 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { TITLE_NOTES, TITLE_EMOJIS, TITLE_COLORS } = require('../commands/create-event');
+const { getComboSuggestion } = require('../combo-suggestions');
 const { isAlreadyGoneError } = require('../discord-errors');
 
 const DEFAULT_COLOR = 0x2ecc71;
@@ -18,6 +19,7 @@ function buildEventEmbed(event, signups) {
         .join('\n');
 
   const notes = TITLE_NOTES[event.title];
+  const comboSuggestion = getComboSuggestion(event.title, signups);
   const emoji = TITLE_EMOJIS[event.title];
   const displayTitle = emoji ? `${emoji} ${event.title}` : event.title;
   const fields = [
@@ -26,6 +28,7 @@ function buildEventEmbed(event, signups) {
     { name: '人數', value: `${signups.length} / ${event.capacity}`, inline: true },
     { name: '開團主', value: `<@${event.creator_id}>`, inline: true },
     ...(notes ? [{ name: '注意事項', value: notes }] : []),
+    ...(comboSuggestion ? [{ name: '職業搭配建議', value: comboSuggestion }] : []),
     { name: '名單', value: roster },
   ];
 
