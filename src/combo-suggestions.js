@@ -30,6 +30,9 @@ const TITLE_COMBO_RULES = {
     },
     { classes: ['黑騎士'], count: 1, label: '黑騎士' },
   ],
+  阿卡: [
+    { classes: MAGE, count: 1, label: '法師' },
+  ],
 };
 
 // Not tied to any specific boss - these fire whenever the trigger class is

@@ -69,6 +69,15 @@ describe('getComboSuggestion', () => {
     expect(result).toBe('還缺：黑騎士 1 位\n💡 已有聖騎士，建議再帶 1 位火毒或冰雷');
   });
 
+  test('阿卡 flags a missing mage', () => {
+    const result = getComboSuggestion('阿卡', [signup('黑騎士')]);
+    expect(result).toBe('還缺：法師 1 位');
+  });
+
+  test('阿卡 is satisfied with one mage', () => {
+    expect(getComboSuggestion('阿卡', [signup('冰雷')])).toBeNull();
+  });
+
   test('returns null for a title with no configured rules', () => {
     expect(getComboSuggestion('週三夜間團', [signup('黑騎士')])).toBeNull();
   });
