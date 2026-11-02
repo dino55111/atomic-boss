@@ -130,45 +130,39 @@ async function handleAssistClassChoiceButton(interaction) {
   await interaction.showModal(buildAssistJoinModal(eventId, target, className, flow));
 }
 
-// Shown right after /boss creates and posts the event (see
-// create-event-modal.js), so the creator can pre-fill known members before
-// anyone else sees the signup card.
+// Shown right after /boss creates the event in the DB (see
+// create-event-modal.js). The event isn't posted to the channel yet — it
+// only goes out once the creator picks "直接發布" here or "發布" below, so
+// anyone who'd see the signup card sees the pre-filled roster from the start
+// instead of watching people get added one at a time.
 function buildPostCreateAssistPromptRow(eventId) {
   const assistButton = new ButtonBuilder()
     .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
     .setLabel('幫人卡位')
     .setStyle(ButtonStyle.Secondary);
 
-  const skipButton = new ButtonBuilder()
-    .setCustomId('postcreate-assist-skip')
-    .setLabel('不用')
+  const publishButton = new ButtonBuilder()
+    .setCustomId(`postcreate-publish:${eventId}`)
+    .setLabel('直接發布')
     .setStyle(ButtonStyle.Secondary);
 
-  return new ActionRowBuilder().addComponents(assistButton, skipButton);
+  return new ActionRowBuilder().addComponents(assistButton, publishButton);
 }
 
 // Shown after each successful postcreate-flow signup so the creator can
-// loop back into the same assist chain for the next person.
-function buildContinueOrDoneRow(eventId) {
+// loop back into the same assist chain for the next person, or publish now.
+function buildContinueOrPublishRow(eventId) {
   const continueButton = new ButtonBuilder()
     .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
     .setLabel('再加一個')
     .setStyle(ButtonStyle.Secondary);
 
-  const doneButton = new ButtonBuilder()
-    .setCustomId('postcreate-assist-done')
-    .setLabel('完成')
+  const publishButton = new ButtonBuilder()
+    .setCustomId(`postcreate-publish:${eventId}`)
+    .setLabel('發布')
     .setStyle(ButtonStyle.Secondary);
 
-  return new ActionRowBuilder().addComponents(continueButton, doneButton);
-}
-
-async function handlePostCreateAssistSkipButton(interaction) {
-  await interaction.update({ content: '好的，之後要卡位可以在訊息上按「代報名」', components: [] });
-}
-
-async function handlePostCreateAssistDoneButton(interaction) {
-  await interaction.update({ content: '好的，卡位完成！', components: [] });
+  return new ActionRowBuilder().addComponents(continueButton, publishButton);
 }
 
 function generateExternalUserId() {
@@ -238,24 +232,29 @@ async function handleAssistJoinModal(interaction, db) {
     return;
   }
 
-  const signups = getSignups(db, event.id);
-  await updateEventAnnouncement(interaction.client, event, signups);
+  // Before the event is published (see create-event-modal.js), there's no
+  // announcement message or thread yet to update/notify — the roster just
+  // accumulates in the DB and shows up fully formed once it's posted.
+  if (event.thread_id) {
+    const signups = getSignups(db, event.id);
+    await updateEventAnnouncement(interaction.client, event, signups);
 
-  const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
-  const noteSegment = note ? `／備註：${note}` : '';
-  const thread = await interaction.client.channels.fetch(event.thread_id);
-  // Discord rejects allowed_mentions.users containing a duplicate id, which
-  // happens if a helper picks themselves as the assist target.
-  const mentionableUserIds = isExternal ? [interaction.user.id] : [...new Set([userId, interaction.user.id])];
-  await thread.send({
-    content: `${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`,
-    allowedMentions: { users: mentionableUserIds },
-  });
+    const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
+    const noteSegment = note ? `／備註：${note}` : '';
+    const thread = await interaction.client.channels.fetch(event.thread_id);
+    // Discord rejects allowed_mentions.users containing a duplicate id, which
+    // happens if a helper picks themselves as the assist target.
+    const mentionableUserIds = isExternal ? [interaction.user.id] : [...new Set([userId, interaction.user.id])];
+    await thread.send({
+      content: `${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`,
+      allowedMentions: { users: mentionableUserIds },
+    });
+  }
 
   if (acked && flow === POSTCREATE_FLOW) {
     await interaction.followUp({
       content: `已幫 ${displayName} 卡位，要繼續加人嗎？`,
-      components: [buildContinueOrDoneRow(event.id)],
+      components: [buildContinueOrPublishRow(event.id)],
       ephemeral: true,
     });
   }
@@ -268,12 +267,10 @@ module.exports = {
   buildAssistClassButtonRows,
   buildAssistJoinModal,
   buildPostCreateAssistPromptRow,
-  buildContinueOrDoneRow,
+  buildContinueOrPublishRow,
   handleAssistButton,
   handleAssistUserSelect,
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
-  handlePostCreateAssistSkipButton,
-  handlePostCreateAssistDoneButton,
 };

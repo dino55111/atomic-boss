@@ -1,9 +1,11 @@
-const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
+const { createEvent, getEventById, getSignups, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
 const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { buildPostCreateAssistPromptRow } = require('./assist-signup');
 const { START_TIME_PATTERN, resolveStartDateTime, formatStartTimeWithWeekday } = require('../start-time');
+
+const NOT_FOUND_MESSAGE = '找不到這個揪團，可能已經被刪除了';
 
 function isValidStartTime(rawStartTime) {
   const match = START_TIME_PATTERN.exec(rawStartTime);
@@ -24,6 +26,35 @@ function isFutureStartTime(rawStartTime, now = new Date()) {
   return candidate !== null && candidate.getTime() > now.getTime();
 }
 
+// Posts the event to its channel (with whatever's already in its roster —
+// the creator may have pre-filled members before this ever runs), creates
+// its thread, and records the resulting ids. Takes a channel rather than a
+// client so it can be driven from either handleCreateEventModal's ack-failed
+// fallback (interaction.channel doesn't depend on the interaction's token)
+// or the postcreate "發布" button, without either depending on the other.
+async function publishEvent(channel, db, event, now = new Date()) {
+  const signups = getSignups(db, event.id);
+  const embed = buildEventEmbed(event, signups);
+  const row = buildActionRow(event, signups.length);
+  const managementRow = buildManagementRow(event.id);
+
+  const message = await channel.send({ embeds: [embed], components: [row, managementRow] });
+  updateEventMessageId(db, event.id, message.id);
+
+  const thread = await message.startThread({
+    name: `${formatStartTimeWithWeekday(event.start_time, now)} ${event.title} ${event.session}場`.slice(0, 100),
+  });
+  updateEventThreadId(db, event.id, thread.id);
+
+  // Discord doesn't reliably let you click the buttons on a thread's starter
+  // message from within the thread itself (they work fine from the main
+  // channel) — see updateEventAnnouncement. Posting an independent copy of
+  // just the buttons (no embed — the main channel copy already shows it)
+  // straight into the thread gives it working buttons too.
+  const threadMessage = await thread.send({ components: [row, managementRow] });
+  updateEventThreadMessageId(db, event.id, threadMessage.id);
+}
+
 async function handleCreateEventModal(interaction, db, now = new Date()) {
   const [, title, sessionRaw] = interaction.customId.split(':');
   const session = Number.parseInt(sessionRaw, 10);
@@ -35,8 +66,10 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
 
   // If the ack fails (stale interaction), we can no longer message the user
   // via this interaction, but the event itself must still be created — that
-  // doesn't depend on this interaction's token. The announcement is posted
-  // via interaction.channel.send() rather than followUp() for the same reason.
+  // doesn't depend on this interaction's token. Without a live interaction
+  // to prompt the creator, it's published immediately instead of waiting for
+  // them to finish pre-filling (interaction.channel.send() doesn't depend on
+  // the interaction's token either, for the same reason).
   const acked = await tryAcknowledgeAndDeleteReply(interaction);
 
   if (!isValidStartTime(startTime)) {
@@ -70,33 +103,43 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
     creatorId: interaction.user.id,
   });
 
-  const embed = buildEventEmbed(event, []);
-  const row = buildActionRow(event, 0);
-  const managementRow = buildManagementRow(event.id);
-
-  const message = await interaction.channel.send({ embeds: [embed], components: [row, managementRow] });
-  updateEventMessageId(db, event.id, message.id);
-
-  const thread = await message.startThread({
-    name: `${formatStartTimeWithWeekday(startTime, now)} ${title} ${session}場`.slice(0, 100),
-  });
-  updateEventThreadId(db, event.id, thread.id);
-
-  // Discord doesn't reliably let you click the buttons on a thread's starter
-  // message from within the thread itself (they work fine from the main
-  // channel) — see updateEventAnnouncement. Posting an independent copy of
-  // just the buttons (no embed — the main channel copy already shows it)
-  // straight into the thread gives it working buttons too.
-  const threadMessage = await thread.send({ components: [row, managementRow] });
-  updateEventThreadMessageId(db, event.id, threadMessage.id);
-
-  if (acked) {
-    await interaction.followUp({
-      content: '揪團已建立！要先幫人卡位嗎？',
-      components: [buildPostCreateAssistPromptRow(event.id)],
-      ephemeral: true,
-    });
+  if (!acked) {
+    await publishEvent(interaction.channel, db, event, now);
+    return;
   }
+
+  await interaction.followUp({
+    content: '揪團資料已建立，要先幫人卡位再發布嗎？',
+    components: [buildPostCreateAssistPromptRow(event.id)],
+    ephemeral: true,
+  });
 }
 
-module.exports = { handleCreateEventModal, isValidStartTime, isFutureStartTime };
+async function handlePostCreatePublishButton(interaction, db) {
+  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const event = getEventById(db, eventId);
+
+  if (!event) {
+    await interaction.update({ content: NOT_FOUND_MESSAGE, components: [] });
+    return;
+  }
+
+  // A leftover button from an earlier step in this same flow (e.g. the
+  // "幫人卡位" prompt a couple of steps back) can still be visible and
+  // clickable after the creator already published via a later one.
+  if (event.thread_id) {
+    await interaction.update({ content: '已經發布過了', components: [] });
+    return;
+  }
+
+  await interaction.update({ content: '發布中…', components: [] });
+  await publishEvent(interaction.channel, db, event);
+}
+
+module.exports = {
+  handleCreateEventModal,
+  isValidStartTime,
+  isFutureStartTime,
+  publishEvent,
+  handlePostCreatePublishButton,
+};

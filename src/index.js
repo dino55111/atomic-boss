@@ -4,7 +4,7 @@ const { Client, GatewayIntentBits, Events } = require('discord.js');
 const { initDb } = require('./db/db');
 const createEventCommand = require('./commands/create-event');
 const listEventsCommand = require('./commands/list-events');
-const { handleCreateEventModal } = require('./interactions/create-event-modal');
+const { handleCreateEventModal, handlePostCreatePublishButton } = require('./interactions/create-event-modal');
 const { handleJoinModal } = require('./interactions/join-modal');
 const {
   handleSignupButton,
@@ -19,8 +19,6 @@ const {
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
-  handlePostCreateAssistSkipButton,
-  handlePostCreateAssistDoneButton,
 } = require('./interactions/assist-signup');
 const {
   handleEditTimeButton,
@@ -64,8 +62,7 @@ const handleInteraction = createInteractionHandler({
   handleCancelEventButton,
   handleCancelEventConfirmButton,
   handleCancelEventAbortButton,
-  handlePostCreateAssistSkipButton,
-  handlePostCreateAssistDoneButton,
+  handlePostCreatePublishButton,
 });
 
 // GuildMessages is only needed for the command-only-channel enforcement

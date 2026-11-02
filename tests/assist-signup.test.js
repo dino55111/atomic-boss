@@ -5,14 +5,12 @@ const {
   buildAssistClassButtonRows,
   buildAssistJoinModal,
   buildPostCreateAssistPromptRow,
-  buildContinueOrDoneRow,
+  buildContinueOrPublishRow,
   handleAssistButton,
   handleAssistUserSelect,
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
-  handlePostCreateAssistSkipButton,
-  handlePostCreateAssistDoneButton,
 } = require('../src/interactions/assist-signup');
 const { CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
@@ -73,18 +71,18 @@ describe('buildAssistJoinModal', () => {
 });
 
 describe('buildPostCreateAssistPromptRow', () => {
-  test('offers to pre-fill members (routing into the postcreate assist flow) or skip', () => {
+  test('offers to pre-fill members (routing into the postcreate assist flow) or publish immediately', () => {
     const row = buildPostCreateAssistPromptRow(42);
     expect(row.components[0].data.custom_id).toBe('assist:42:postcreate');
-    expect(row.components[1].data.custom_id).toBe('postcreate-assist-skip');
+    expect(row.components[1].data.custom_id).toBe('postcreate-publish:42');
   });
 });
 
-describe('buildContinueOrDoneRow', () => {
-  test('offers to add another person (routing back into the postcreate assist flow) or finish', () => {
-    const row = buildContinueOrDoneRow(42);
+describe('buildContinueOrPublishRow', () => {
+  test('offers to add another person (routing back into the postcreate assist flow) or publish', () => {
+    const row = buildContinueOrPublishRow(42);
     expect(row.components[0].data.custom_id).toBe('assist:42:postcreate');
-    expect(row.components[1].data.custom_id).toBe('postcreate-assist-done');
+    expect(row.components[1].data.custom_id).toBe('postcreate-publish:42');
   });
 });
 
@@ -165,29 +163,21 @@ describe('handleAssistClassChoiceButton', () => {
   });
 });
 
-describe('handlePostCreateAssistSkipButton', () => {
-  test('dismisses the prompt without recording anything', async () => {
-    const interaction = { customId: 'postcreate-assist-skip', update: jest.fn(async () => {}) };
-    await handlePostCreateAssistSkipButton(interaction);
-
-    expect(interaction.update).toHaveBeenCalledWith({
-      content: '好的，之後要卡位可以在訊息上按「代報名」',
-      components: [],
-    });
+// Not yet posted to the channel (create-event-modal.js leaves message_id as
+// 'pending' and never creates a thread until the creator publishes), unlike
+// makeEvent below which models an already-published event.
+function makeUnpublishedEvent(db, overrides = {}) {
+  return createEvent(db, {
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    messageId: 'pending',
+    title: '週三夜間團',
+    capacity: 2,
+    startTime: '7/12 20:00',
+    creatorId: 'creator-1',
+    ...overrides,
   });
-});
-
-describe('handlePostCreateAssistDoneButton', () => {
-  test('dismisses the prompt', async () => {
-    const interaction = { customId: 'postcreate-assist-done', update: jest.fn(async () => {}) };
-    await handlePostCreateAssistDoneButton(interaction);
-
-    expect(interaction.update).toHaveBeenCalledWith({
-      content: '好的，卡位完成！',
-      components: [],
-    });
-  });
-});
+}
 
 function makeEvent(db, overrides = {}) {
   const event = createEvent(db, {
@@ -446,17 +436,15 @@ describe('handleAssistJoinModal', () => {
     expect(getSignups(db, event.id)).toHaveLength(1);
   });
 
-  test('prompts to add another when the postcreate flow signs someone up successfully', async () => {
+  test('prompts to add another when the postcreate flow signs someone up successfully, before the event is published', async () => {
     const db = initDb(':memory:');
-    const event = makeEvent(db);
-    const editedMessage = { edit: jest.fn(async () => {}) };
+    const event = makeUnpublishedEvent(db);
     const thread = { send: jest.fn(async () => {}) };
     const interaction = makeAssistModalInteraction({
       customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
       helperId: 'helper-1',
       fieldValues: { level: '70', game_id: 'ice#1' },
       fetchedUser: { username: 'IceGuy' },
-      fetchedMessage: editedMessage,
       thread,
     });
 
@@ -468,7 +456,28 @@ describe('handleAssistJoinModal', () => {
     }));
     const prompt = interaction.followUp.mock.calls[0][0];
     expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
-    expect(prompt.components[0].components[1].data.custom_id).toBe('postcreate-assist-done');
+    expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
+  });
+
+  test('does not touch any announcement message or thread when the event has not been published yet', async () => {
+    // No message/thread exist before publish (see create-event-modal.js),
+    // so there's nothing to edit or notify — the roster just accumulates in
+    // the DB until the creator publishes.
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.client.channels.fetch).not.toHaveBeenCalled();
+    expect(thread.send).not.toHaveBeenCalled();
   });
 
   test('does not prompt to add another when invoked from the always-on 代報名 button (no flow)', async () => {

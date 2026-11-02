@@ -1,9 +1,24 @@
-const { initDb, getEventById } = require('../src/db/db');
-const { handleCreateEventModal, isValidStartTime, isFutureStartTime } = require('../src/interactions/create-event-modal');
+const { initDb, getEventById, createEvent, updateEventThreadId, addSignup } = require('../src/db/db');
+const {
+  handleCreateEventModal,
+  isValidStartTime,
+  isFutureStartTime,
+  publishEvent,
+  handlePostCreatePublishButton,
+} = require('../src/interactions/create-event-modal');
 
-function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minute = '00', deferUpdateFails = false }) {
+function makeChannel() {
   const thread = { id: 'thread-1', send: jest.fn(async () => ({ id: 'thread-message-1' })) };
   const startThread = jest.fn(async () => thread);
+  return {
+    send: jest.fn(async () => ({ id: 'message-1', startThread })),
+    startThread,
+    thread,
+  };
+}
+
+function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minute = '00', deferUpdateFails = false }) {
+  const channel = makeChannel();
   const selectValues = { event_date: date, event_hour: hour, event_minute: minute };
   return {
     customId: `create-event-modal:${title}:${session}`,
@@ -18,14 +33,7 @@ function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minut
     }),
     deleteReply: jest.fn(async () => {}),
     followUp: jest.fn(async () => {}),
-    channel: {
-      send: jest.fn(async () => ({
-        id: 'message-1',
-        startThread,
-      })),
-    },
-    startThread,
-    thread,
+    channel,
   };
 }
 
@@ -74,7 +82,7 @@ describe('handleCreateEventModal', () => {
   // doesn't reject them as the real wall clock moves past those dates.
   const FIXED_NOW = new Date(2026, 0, 1, 0, 0);
 
-  test('deletes the title-picker message, creates the event with the capacity derived from the title, and posts the embed to the channel', async () => {
+  test('creates the event with the capacity derived from the title, but does not post anything yet', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉' });
 
@@ -82,42 +90,10 @@ describe('handleCreateEventModal', () => {
 
     expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
     expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
-    expect(interaction.channel.send).toHaveBeenCalledTimes(1);
-    const sentPayload = interaction.channel.send.mock.calls[0][0];
-    expect(sentPayload.embeds).toHaveLength(1);
-    expect(sentPayload.components).toHaveLength(2);
+    expect(interaction.channel.send).not.toHaveBeenCalled();
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'message-1', thread_id: 'thread-1' });
-  });
-
-  // Discord doesn't reliably let you click the buttons on a thread's starter
-  // message from within the thread itself, so an independently clickable
-  // copy of just the buttons (no embed card) is posted straight into the
-  // thread.
-  test('also posts the buttons (without the embed card) into the new thread and stores its message id', async () => {
-    const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉' });
-
-    await handleCreateEventModal(interaction, db, FIXED_NOW);
-
-    expect(interaction.thread.send).toHaveBeenCalledTimes(1);
-    const threadPayload = interaction.thread.send.mock.calls[0][0];
-    expect(threadPayload.embeds).toBeUndefined();
-    expect(threadPayload.components).toHaveLength(2);
-
-    const event = getEventById(db, 1);
-    expect(event.thread_message_id).toBe('thread-message-1');
-  });
-
-  test('thread name is prefixed with the composed 日期 (星期幾) 時:分 and suffixed with the chosen session', async () => {
-    const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉', session: 3, date: '7/12', hour: '20', minute: '00' });
-
-    await handleCreateEventModal(interaction, db, FIXED_NOW);
-
-    // 2026-07-12 is a Sunday.
-    expect(interaction.startThread).toHaveBeenCalledWith({ name: '7/12 (日) 20:00 普拉 3場' });
+    expect(event).toMatchObject({ title: '普拉', capacity: 6, session: 1, message_id: 'pending', thread_id: null });
   });
 
   test('composes the start time from the date, hour, and minute selects', async () => {
@@ -150,7 +126,7 @@ describe('handleCreateEventModal', () => {
     expect(event.capacity).toBe(12);
   });
 
-  test('follows up with an ephemeral prompt offering to pre-fill members, scoped to the new event', async () => {
+  test('follows up with an ephemeral prompt offering to pre-fill members or publish immediately, scoped to the new event', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉' });
 
@@ -158,14 +134,18 @@ describe('handleCreateEventModal', () => {
 
     const event = getEventById(db, 1);
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
-      content: '揪團已建立！要先幫人卡位嗎？',
+      content: '揪團資料已建立，要先幫人卡位再發布嗎？',
       ephemeral: true,
     }));
     const prompt = interaction.followUp.mock.calls[0][0];
     expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
+    expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
   });
 
-  test('still creates the event and posts the embed when the interaction ack fails (stale interaction)', async () => {
+  // The event itself, and publishing it, must not depend on this
+  // interaction's token (it may already be stale/expired) — only the
+  // pre-fill prompt does, since that requires talking back to the creator.
+  test('still creates and immediately publishes the event when the interaction ack fails (stale interaction)', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉', deferUpdateFails: true });
 
@@ -176,7 +156,7 @@ describe('handleCreateEventModal', () => {
     expect(interaction.channel.send).toHaveBeenCalledTimes(1);
 
     const event = getEventById(db, 1);
-    expect(event).toMatchObject({ title: '普拉', capacity: 6 });
+    expect(event).toMatchObject({ title: '普拉', capacity: 6, message_id: 'message-1', thread_id: 'thread-1' });
   });
 
   test('rejects a past-today time without creating the event', async () => {
@@ -192,5 +172,131 @@ describe('handleCreateEventModal', () => {
       ephemeral: true,
     });
     expect(getEventById(db, 1)).toBeUndefined();
+  });
+});
+
+function makeUnpublishedEvent(db, overrides = {}) {
+  return createEvent(db, {
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    messageId: 'pending',
+    title: '普拉',
+    capacity: 6,
+    startTime: '7/12 20:00',
+    creatorId: 'creator-1',
+    ...overrides,
+  });
+}
+
+describe('publishEvent', () => {
+  const FIXED_NOW = new Date(2026, 0, 1, 0, 0);
+
+  test('posts the embed and buttons to the channel, and stores the message id', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    const sentPayload = channel.send.mock.calls[0][0];
+    expect(sentPayload.embeds).toHaveLength(1);
+    expect(sentPayload.components).toHaveLength(2);
+    expect(getEventById(db, event.id).message_id).toBe('message-1');
+  });
+
+  // Discord doesn't reliably let you click the buttons on a thread's starter
+  // message from within the thread itself, so an independently clickable
+  // copy of just the buttons (no embed card) is posted straight into the
+  // thread.
+  test('creates a thread and also posts the buttons (without the embed card) into it, storing both ids', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    expect(channel.thread.send).toHaveBeenCalledTimes(1);
+    const threadPayload = channel.thread.send.mock.calls[0][0];
+    expect(threadPayload.embeds).toBeUndefined();
+    expect(threadPayload.components).toHaveLength(2);
+
+    const updated = getEventById(db, event.id);
+    expect(updated.thread_id).toBe('thread-1');
+    expect(updated.thread_message_id).toBe('thread-message-1');
+  });
+
+  test('thread name is prefixed with the composed 日期 (星期幾) 時:分 and suffixed with the session', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db, { session: 3, startTime: '7/12 20:00' });
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    // 2026-07-12 is a Sunday.
+    expect(channel.startThread).toHaveBeenCalledWith({ name: '7/12 (日) 20:00 普拉 3場' });
+  });
+
+  test('includes any already-recorded signups in the posted roster', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-9', displayName: 'IceGuy', className: '冰雷', level: '70', gameId: 'ice#1' });
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    const sentPayload = channel.send.mock.calls[0][0];
+    const countField = sentPayload.embeds[0].data.fields.find((field) => field.name === '人數');
+    expect(countField.value).toBe('1 / 6');
+  });
+});
+
+describe('handlePostCreatePublishButton', () => {
+  function makeButtonInteraction({ eventId, channel }) {
+    return {
+      customId: `postcreate-publish:${eventId}`,
+      channel,
+      update: jest.fn(async () => {}),
+    };
+  }
+
+  test('publishes the event and dismisses the prompt', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    const channel = makeChannel();
+    const interaction = makeButtonInteraction({ eventId: event.id, channel });
+
+    await handlePostCreatePublishButton(interaction, db);
+
+    expect(channel.send).toHaveBeenCalledTimes(1);
+    expect(interaction.update).toHaveBeenCalledWith(expect.objectContaining({ components: [] }));
+    expect(getEventById(db, event.id).message_id).toBe('message-1');
+  });
+
+  test('does not publish a second time when clicked again on an already-published event', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+    const channel = makeChannel();
+    const interaction = makeButtonInteraction({ eventId: event.id, channel });
+
+    await handlePostCreatePublishButton(interaction, db);
+
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(interaction.update).toHaveBeenCalledWith({ content: '已經發布過了', components: [] });
+  });
+
+  test('tells the creator the event could not be found when it no longer exists', async () => {
+    const db = initDb(':memory:');
+    const channel = makeChannel();
+    const interaction = makeButtonInteraction({ eventId: 999, channel });
+
+    await handlePostCreatePublishButton(interaction, db);
+
+    expect(channel.send).not.toHaveBeenCalled();
+    expect(interaction.update).toHaveBeenCalledWith({
+      content: '找不到這個揪團，可能已經被刪除了',
+      components: [],
+    });
   });
 });

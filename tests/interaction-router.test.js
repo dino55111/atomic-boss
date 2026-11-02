@@ -32,8 +32,7 @@ function makeHandlers(overrides = {}) {
     handleCancelEventButton: jest.fn(),
     handleCancelEventConfirmButton: jest.fn(),
     handleCancelEventAbortButton: jest.fn(),
-    handlePostCreateAssistSkipButton: jest.fn(),
-    handlePostCreateAssistDoneButton: jest.fn(),
+    handlePostCreatePublishButton: jest.fn(),
     ...overrides,
   };
 }
@@ -229,24 +228,15 @@ describe('createInteractionHandler', () => {
     expect(handleCancelEventAbortButton).toHaveBeenCalledWith(interaction);
   });
 
-  test('routes postcreate-assist-skip button clicks to handlePostCreateAssistSkipButton', async () => {
-    const handlePostCreateAssistSkipButton = jest.fn(async () => {});
-    const handle = createInteractionHandler(makeHandlers({ handlePostCreateAssistSkipButton }));
-    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'postcreate-assist-skip' });
+  test('routes postcreate-publish button clicks to handlePostCreatePublishButton with the db', async () => {
+    const handlePostCreatePublishButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handlePostCreatePublishButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'postcreate-publish:1' });
 
     await handle(interaction);
 
-    expect(handlePostCreateAssistSkipButton).toHaveBeenCalledWith(interaction);
-  });
-
-  test('routes postcreate-assist-done button clicks to handlePostCreateAssistDoneButton', async () => {
-    const handlePostCreateAssistDoneButton = jest.fn(async () => {});
-    const handle = createInteractionHandler(makeHandlers({ handlePostCreateAssistDoneButton }));
-    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'postcreate-assist-done' });
-
-    await handle(interaction);
-
-    expect(handlePostCreateAssistDoneButton).toHaveBeenCalledWith(interaction);
+    expect(handlePostCreatePublishButton).toHaveBeenCalledWith(interaction, db);
   });
 
   test('routes edit-time-modal submissions to handleEditTimeModal with the db', async () => {
