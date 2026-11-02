@@ -114,7 +114,7 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
     components: [buildPostCreateAssistPromptRow(event.id)],
     ephemeral: true,
   });
-  registerPostCreatePrompt(event.id, prompt);
+  registerPostCreatePrompt(event.id, interaction.webhook, prompt.id);
 }
 
 async function handlePostCreatePublishButton(interaction, db) {

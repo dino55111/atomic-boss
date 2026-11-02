@@ -215,7 +215,8 @@ function makeAssistModalInteraction({ customId, helperId, fieldValues, fetchedUs
     },
     deferUpdate: jest.fn(async () => {}),
     deleteReply: jest.fn(async () => {}),
-    followUp: jest.fn(async () => ({ delete: jest.fn(async () => {}) })),
+    followUp: jest.fn(async () => ({ id: 'prompt-message-1' })),
+    webhook: { deleteMessage: jest.fn(async () => {}) },
     channel,
     client: {
       channels: { fetch: jest.fn(async (id) => (id === 'thread-1' ? thread : channel)) },
@@ -460,10 +461,9 @@ describe('handleAssistJoinModal', () => {
     expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
   });
 
-  test('registers the continue/publish prompt so it gets deleted once the event is published', async () => {
+  test('registers the continue/publish prompt (via its own webhook) so it gets deleted once the event is published', async () => {
     const db = initDb(':memory:');
     const event = makeUnpublishedEvent(db);
-    const promptMessage = { delete: jest.fn(async () => {}) };
     const interaction = makeAssistModalInteraction({
       customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
       helperId: 'helper-1',
@@ -471,12 +471,12 @@ describe('handleAssistJoinModal', () => {
       fetchedUser: { username: 'IceGuy' },
       thread: { send: jest.fn(async () => {}) },
     });
-    interaction.followUp = jest.fn(async () => promptMessage);
+    interaction.followUp = jest.fn(async () => ({ id: 'prompt-message-1' }));
 
     await handleAssistJoinModal(interaction, db);
     await deletePostCreatePrompts(event.id);
 
-    expect(promptMessage.delete).toHaveBeenCalledTimes(1);
+    expect(interaction.webhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
   });
 
   test('does not touch any announcement message or thread when the event has not been published yet', async () => {

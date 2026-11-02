@@ -258,7 +258,7 @@ async function handleAssistJoinModal(interaction, db) {
       components: [buildContinueOrPublishRow(event.id)],
       ephemeral: true,
     });
-    registerPostCreatePrompt(event.id, prompt);
+    registerPostCreatePrompt(event.id, interaction.webhook, prompt.id);
   }
 }
 

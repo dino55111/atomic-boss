@@ -33,7 +33,8 @@ function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minut
       }
     }),
     deleteReply: jest.fn(async () => {}),
-    followUp: jest.fn(async () => ({ delete: jest.fn(async () => {}) })),
+    followUp: jest.fn(async () => ({ id: 'prompt-message-1' })),
+    webhook: { deleteMessage: jest.fn(async () => {}) },
     channel,
   };
 }
@@ -143,11 +144,10 @@ describe('handleCreateEventModal', () => {
     expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
   });
 
-  test('registers the pre-fill prompt so it gets deleted once the event is published', async () => {
+  test('registers the pre-fill prompt (via its own webhook) so it gets deleted once the event is published', async () => {
     const db = initDb(':memory:');
-    const promptMessage = { delete: jest.fn(async () => {}) };
     const interaction = makeInteraction({ title: '普拉' });
-    interaction.followUp = jest.fn(async () => promptMessage);
+    interaction.followUp = jest.fn(async () => ({ id: 'prompt-message-1' }));
 
     await handleCreateEventModal(interaction, db, FIXED_NOW);
 
@@ -158,7 +158,7 @@ describe('handleCreateEventModal', () => {
       db,
     );
 
-    expect(promptMessage.delete).toHaveBeenCalledTimes(1);
+    expect(interaction.webhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
   });
 
   // The event itself, and publishing it, must not depend on this
@@ -285,14 +285,14 @@ describe('handlePostCreatePublishButton', () => {
     const event = makeUnpublishedEvent(db);
     const channel = makeChannel();
     const interaction = makeButtonInteraction({ eventId: event.id, channel });
-    const promptMessage = { delete: jest.fn(async () => {}) };
-    registerPostCreatePrompt(event.id, promptMessage);
+    const promptWebhook = { deleteMessage: jest.fn(async () => {}) };
+    registerPostCreatePrompt(event.id, promptWebhook, 'prompt-message-1');
 
     await handlePostCreatePublishButton(interaction, db);
 
     expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledTimes(1);
-    expect(promptMessage.delete).toHaveBeenCalledTimes(1);
+    expect(promptWebhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
     expect(getEventById(db, event.id).message_id).toBe('message-1');
   });
 
