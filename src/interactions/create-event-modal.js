@@ -3,6 +3,7 @@ const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embe
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { buildPostCreateAssistPromptRow } = require('./assist-signup');
+const { registerPostCreatePrompt, deletePostCreatePrompts } = require('./postcreate-prompts');
 const { START_TIME_PATTERN, resolveStartDateTime, formatStartTimeWithWeekday } = require('../start-time');
 
 const NOT_FOUND_MESSAGE = '找不到這個揪團，可能已經被刪除了';
@@ -108,11 +109,12 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
     return;
   }
 
-  await interaction.followUp({
+  const prompt = await interaction.followUp({
     content: '揪團資料已建立，要先幫人卡位再發布嗎？',
     components: [buildPostCreateAssistPromptRow(event.id)],
     ephemeral: true,
   });
+  registerPostCreatePrompt(event.id, prompt);
 }
 
 async function handlePostCreatePublishButton(interaction, db) {
@@ -132,7 +134,8 @@ async function handlePostCreatePublishButton(interaction, db) {
     return;
   }
 
-  await interaction.update({ content: '發布中…', components: [] });
+  await interaction.deferUpdate();
+  await deletePostCreatePrompts(event.id);
   await publishEvent(interaction.channel, db, event);
 }
 

@@ -13,6 +13,7 @@ const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { getOptionalTextInputValue, isValidLevel } = require('./join-modal');
 const { buildClassButtonRowsForCustomIds } = require('./signup-button');
+const { registerPostCreatePrompt } = require('./postcreate-prompts');
 
 const EXTERNAL_TARGET = 'external';
 const POSTCREATE_FLOW = 'postcreate';
@@ -252,11 +253,12 @@ async function handleAssistJoinModal(interaction, db) {
   }
 
   if (acked && flow === POSTCREATE_FLOW) {
-    await interaction.followUp({
+    const prompt = await interaction.followUp({
       content: `已幫 ${displayName} 卡位，要繼續加人嗎？`,
       components: [buildContinueOrPublishRow(event.id)],
       ephemeral: true,
     });
+    registerPostCreatePrompt(event.id, prompt);
   }
 }
 
