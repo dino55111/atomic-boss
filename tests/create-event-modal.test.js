@@ -8,7 +8,11 @@ const {
 } = require('../src/interactions/create-event-modal');
 
 function makeChannel() {
-  const thread = { id: 'thread-1', send: jest.fn(async () => ({ id: 'thread-message-1' })) };
+  const thread = {
+    id: 'thread-1',
+    send: jest.fn(async () => ({ id: 'thread-message-1' })),
+    members: { add: jest.fn(async () => {}) },
+  };
   const startThread = jest.fn(async () => thread);
   return {
     send: jest.fn(async () => ({ id: 'message-1', startThread })),
@@ -134,7 +138,7 @@ describe('handleCreateEventModal', () => {
 
     const event = getEventById(db, 1);
     expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
-      content: '揪團資料已建立，要先幫人卡位再發布嗎？',
+      content: '揪團資料已建立，要先預先報名再發布嗎？',
       ephemeral: true,
     }));
     const prompt = interaction.followUp.mock.calls[0][0];
@@ -248,6 +252,26 @@ describe('publishEvent', () => {
     const sentPayload = channel.send.mock.calls[0][0];
     const countField = sentPayload.embeds[0].data.fields.find((field) => field.name === '人數');
     expect(countField.value).toBe('1 / 6');
+  });
+
+  test('adds every already-recorded, non-external signup to the new thread', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-9', displayName: 'IceGuy', className: '冰雷', level: '70', gameId: 'ice#1' });
+    addSignup(db, event, {
+      userId: 'ext:1',
+      displayName: 'Friend',
+      className: '火毒',
+      level: '70',
+      gameId: 'fire#1',
+      isExternal: true,
+    });
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    expect(channel.thread.members.add).toHaveBeenCalledTimes(1);
+    expect(channel.thread.members.add).toHaveBeenCalledWith('user-9');
   });
 });
 

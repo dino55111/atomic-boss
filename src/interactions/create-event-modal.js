@@ -46,6 +46,15 @@ async function publishEvent(channel, db, event, now = new Date()) {
   });
   updateEventThreadId(db, event.id, thread.id);
 
+  // Anyone pre-filled before this event was published (see assist-signup.js's
+  // postcreate flow) never had a thread to be @mentioned into yet — unlike
+  // every post-publish signup, which joins the thread as a side effect of
+  // being mentioned in a thread message. Add them explicitly now that the
+  // thread exists. External signups have no real Discord user to add.
+  await Promise.all(
+    signups.filter((signup) => !signup.is_external).map((signup) => thread.members.add(signup.user_id).catch(() => {})),
+  );
+
   // Discord doesn't reliably let you click the buttons on a thread's starter
   // message from within the thread itself (they work fine from the main
   // channel) — see updateEventAnnouncement. Posting an independent copy of
@@ -109,7 +118,7 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
   }
 
   await interaction.followUp({
-    content: '揪團資料已建立，要先幫人卡位再發布嗎？',
+    content: '揪團資料已建立，要先預先報名再發布嗎？',
     components: [buildPostCreateAssistPromptRow(event.id)],
     ephemeral: true,
   });
@@ -125,7 +134,7 @@ async function handlePostCreatePublishButton(interaction, db) {
   }
 
   // A leftover button from an earlier step in this same flow (e.g. the
-  // "幫人卡位" prompt a couple of steps back) can still be visible and
+  // "預先報名" prompt a couple of steps back) can still be visible and
   // clickable after the creator already published via a later one.
   if (event.thread_id) {
     await interaction.update({ content: '已經發布過了', components: [] });

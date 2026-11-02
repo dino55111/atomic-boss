@@ -99,7 +99,7 @@ describe('handleAssistButton', () => {
 
   // The postcreate flow reuses its own ephemeral message end-to-end instead
   // of replying with a new one at each step (see the module docstring), so
-  // its "幫人卡位"/"再加一個" click edits the message it's already on.
+  // its "預先報名"/"再加一個" click edits the message it's already on.
   test('edits its own message into the target-picker when triggered from the postcreate flow', async () => {
     const interaction = { customId: 'assist:42:postcreate', update: jest.fn(async () => {}) };
     await handleAssistButton(interaction);

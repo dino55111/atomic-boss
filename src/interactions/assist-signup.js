@@ -149,7 +149,7 @@ async function handleAssistClassChoiceButton(interaction) {
 function buildPostCreateAssistPromptRow(eventId) {
   const assistButton = new ButtonBuilder()
     .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
-    .setLabel('幫人卡位')
+    .setLabel('預先報名')
     .setStyle(ButtonStyle.Secondary);
 
   const publishButton = new ButtonBuilder()
