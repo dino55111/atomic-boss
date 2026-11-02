@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getActiveEventsByGuild, getSignups } = require('../db/db');
+const { getActiveEventsWithSignupCounts } = require('../db/db');
 
 const data = new SlashCommandBuilder()
   .setName('list')
@@ -15,13 +15,13 @@ function buildEventLine(event, signupCount) {
 }
 
 async function execute(interaction, db) {
-  const events = getActiveEventsByGuild(db, interaction.guildId);
+  const events = getActiveEventsWithSignupCounts(db, interaction.guildId);
 
   if (events.length === 0) {
     await interaction.reply({ content: '目前沒有進行中的揪團', ephemeral: true });
   } else {
     const description = events
-      .map((event) => buildEventLine(event, getSignups(db, event.id).length))
+      .map((event) => buildEventLine(event, event.signup_count))
       .join('\n');
 
     await interaction.reply({ embeds: [new EmbedBuilder().setDescription(description)], ephemeral: true });

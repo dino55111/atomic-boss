@@ -89,6 +89,21 @@ function getActiveEventsByGuild(db, guildId) {
   return db.prepare('SELECT * FROM events WHERE guild_id = ? AND cleaned_at IS NULL ORDER BY id ASC').all(guildId);
 }
 
+// Same rows as getActiveEventsByGuild, plus each event's signup count — one
+// query via LEFT JOIN + COUNT instead of a getSignups() round trip per event
+// (what /list used to do, fetching every signup row just to discard it and
+// keep the length).
+function getActiveEventsWithSignupCounts(db, guildId) {
+  return db.prepare(`
+    SELECT events.*, COUNT(signups.id) AS signup_count
+    FROM events
+    LEFT JOIN signups ON signups.event_id = events.id
+    WHERE events.guild_id = ? AND events.cleaned_at IS NULL
+    GROUP BY events.id
+    ORDER BY events.id ASC
+  `).all(guildId);
+}
+
 function getEventsPendingReminder(db) {
   return db.prepare('SELECT * FROM events WHERE reminded_at IS NULL ORDER BY id ASC').all();
 }
@@ -188,6 +203,7 @@ module.exports = {
   migrateThreadMessageIdColumn,
   createEvent,
   getActiveEventsByGuild,
+  getActiveEventsWithSignupCounts,
   getEventById,
   getEventByMessageId,
   updateEventMessageId,
