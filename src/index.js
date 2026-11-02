@@ -19,6 +19,8 @@ const {
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handlePostCreateAssistSkipButton,
+  handlePostCreateAssistDoneButton,
 } = require('./interactions/assist-signup');
 const {
   handleEditTimeButton,
@@ -62,6 +64,8 @@ const handleInteraction = createInteractionHandler({
   handleCancelEventButton,
   handleCancelEventConfirmButton,
   handleCancelEventAbortButton,
+  handlePostCreateAssistSkipButton,
+  handlePostCreateAssistDoneButton,
 });
 
 // GuildMessages is only needed for the command-only-channel enforcement

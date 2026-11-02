@@ -2,6 +2,7 @@ const { createEvent, updateEventMessageId, updateEventThreadId, updateEventThrea
 const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
+const { buildPostCreateAssistPromptRow } = require('./assist-signup');
 const { START_TIME_PATTERN, resolveStartDateTime, formatStartTimeWithWeekday } = require('../start-time');
 
 function isValidStartTime(rawStartTime) {
@@ -88,6 +89,14 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
   // straight into the thread gives it working buttons too.
   const threadMessage = await thread.send({ components: [row, managementRow] });
   updateEventThreadMessageId(db, event.id, threadMessage.id);
+
+  if (acked) {
+    await interaction.followUp({
+      content: '揪團已建立！要先幫人卡位嗎？',
+      components: [buildPostCreateAssistPromptRow(event.id)],
+      ephemeral: true,
+    });
+  }
 }
 
 module.exports = { handleCreateEventModal, isValidStartTime, isFutureStartTime };

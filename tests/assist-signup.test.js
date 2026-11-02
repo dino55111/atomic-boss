@@ -4,11 +4,15 @@ const {
   buildAssistTargetPickerRows,
   buildAssistClassButtonRows,
   buildAssistJoinModal,
+  buildPostCreateAssistPromptRow,
+  buildContinueOrDoneRow,
   handleAssistButton,
   handleAssistUserSelect,
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handlePostCreateAssistSkipButton,
+  handlePostCreateAssistDoneButton,
 } = require('../src/interactions/assist-signup');
 const { CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
@@ -18,6 +22,12 @@ describe('buildAssistTargetPickerRows', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0].components[0].data.custom_id).toBe('assist-user-select:42');
     expect(rows[1].components[0].data.custom_id).toBe('assist-external:42');
+  });
+
+  test('appends the flow suffix to both customIds when a flow is given', () => {
+    const rows = buildAssistTargetPickerRows(42, 'postcreate');
+    expect(rows[0].components[0].data.custom_id).toBe('assist-user-select:42:postcreate');
+    expect(rows[1].components[0].data.custom_id).toBe('assist-external:42:postcreate');
   });
 });
 
@@ -31,6 +41,11 @@ describe('buildAssistClassButtonRows', () => {
   test('uses the literal "external" target for a non-Discord friend', () => {
     const rows = buildAssistClassButtonRows(42, EXTERNAL_TARGET);
     expect(rows[0].components[0].data.custom_id).toBe(`assist-class-choice:42:external:${CLASS_OPTIONS[0]}`);
+  });
+
+  test('appends the flow suffix to each class button customId when given', () => {
+    const rows = buildAssistClassButtonRows(42, 'user-9', 'postcreate');
+    expect(rows[0].components[0].data.custom_id).toBe(`assist-class-choice:42:user-9:${CLASS_OPTIONS[0]}:postcreate`);
   });
 });
 
@@ -50,6 +65,27 @@ describe('buildAssistJoinModal', () => {
     expect(modal.components[0].components[0].data.label).toBe('暱稱');
     expect(modal.components[1].components[0].data.label).toBe('等級');
   });
+
+  test('appends the flow suffix to the customId when given', () => {
+    const modal = buildAssistJoinModal(42, 'user-9', '冰雷', 'postcreate');
+    expect(modal.data.custom_id).toBe('assist-join-modal:42:user-9:冰雷:postcreate');
+  });
+});
+
+describe('buildPostCreateAssistPromptRow', () => {
+  test('offers to pre-fill members (routing into the postcreate assist flow) or skip', () => {
+    const row = buildPostCreateAssistPromptRow(42);
+    expect(row.components[0].data.custom_id).toBe('assist:42:postcreate');
+    expect(row.components[1].data.custom_id).toBe('postcreate-assist-skip');
+  });
+});
+
+describe('buildContinueOrDoneRow', () => {
+  test('offers to add another person (routing back into the postcreate assist flow) or finish', () => {
+    const row = buildContinueOrDoneRow(42);
+    expect(row.components[0].data.custom_id).toBe('assist:42:postcreate');
+    expect(row.components[1].data.custom_id).toBe('postcreate-assist-done');
+  });
 });
 
 describe('handleAssistButton', () => {
@@ -62,6 +98,14 @@ describe('handleAssistButton', () => {
     expect(replyPayload.ephemeral).toBe(true);
     expect(replyPayload.components[0].components[0].data.custom_id).toBe('assist-user-select:42');
   });
+
+  test('forwards the flow suffix from its own customId into the target-picker customIds', async () => {
+    const interaction = { customId: 'assist:42:postcreate', reply: jest.fn(async () => {}) };
+    await handleAssistButton(interaction);
+
+    const replyPayload = interaction.reply.mock.calls[0][0];
+    expect(replyPayload.components[0].components[0].data.custom_id).toBe('assist-user-select:42:postcreate');
+  });
 });
 
 describe('handleAssistUserSelect', () => {
@@ -72,6 +116,14 @@ describe('handleAssistUserSelect', () => {
     expect(interaction.update).toHaveBeenCalledTimes(1);
     const payload = interaction.update.mock.calls[0][0];
     expect(payload.components[0].components[0].data.custom_id).toBe(`assist-class-choice:42:user-9:${CLASS_OPTIONS[0]}`);
+  });
+
+  test('forwards the flow suffix from its own customId into the class-picker customIds', async () => {
+    const interaction = { customId: 'assist-user-select:42:postcreate', values: ['user-9'], update: jest.fn(async () => {}) };
+    await handleAssistUserSelect(interaction);
+
+    const payload = interaction.update.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe(`assist-class-choice:42:user-9:${CLASS_OPTIONS[0]}:postcreate`);
   });
 });
 
@@ -84,6 +136,14 @@ describe('handleAssistExternalButton', () => {
     const payload = interaction.update.mock.calls[0][0];
     expect(payload.components[0].components[0].data.custom_id).toBe(`assist-class-choice:42:external:${CLASS_OPTIONS[0]}`);
   });
+
+  test('forwards the flow suffix from its own customId into the class-picker customIds', async () => {
+    const interaction = { customId: 'assist-external:42:postcreate', update: jest.fn(async () => {}) };
+    await handleAssistExternalButton(interaction);
+
+    const payload = interaction.update.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe(`assist-class-choice:42:external:${CLASS_OPTIONS[0]}:postcreate`);
+  });
 });
 
 describe('handleAssistClassChoiceButton', () => {
@@ -94,6 +154,38 @@ describe('handleAssistClassChoiceButton', () => {
     expect(interaction.showModal).toHaveBeenCalledTimes(1);
     const modal = interaction.showModal.mock.calls[0][0];
     expect(modal.data.custom_id).toBe('assist-join-modal:42:user-9:冰雷');
+  });
+
+  test('forwards the flow suffix from its own customId into the join-modal customId', async () => {
+    const interaction = { customId: 'assist-class-choice:42:user-9:冰雷:postcreate', showModal: jest.fn() };
+    await handleAssistClassChoiceButton(interaction);
+
+    const modal = interaction.showModal.mock.calls[0][0];
+    expect(modal.data.custom_id).toBe('assist-join-modal:42:user-9:冰雷:postcreate');
+  });
+});
+
+describe('handlePostCreateAssistSkipButton', () => {
+  test('dismisses the prompt without recording anything', async () => {
+    const interaction = { customId: 'postcreate-assist-skip', update: jest.fn(async () => {}) };
+    await handlePostCreateAssistSkipButton(interaction);
+
+    expect(interaction.update).toHaveBeenCalledWith({
+      content: '好的，之後要卡位可以在訊息上按「代報名」',
+      components: [],
+    });
+  });
+});
+
+describe('handlePostCreateAssistDoneButton', () => {
+  test('dismisses the prompt', async () => {
+    const interaction = { customId: 'postcreate-assist-done', update: jest.fn(async () => {}) };
+    await handlePostCreateAssistDoneButton(interaction);
+
+    expect(interaction.update).toHaveBeenCalledWith({
+      content: '好的，卡位完成！',
+      components: [],
+    });
   });
 });
 
@@ -352,6 +444,50 @@ describe('handleAssistJoinModal', () => {
     expect(thread.send).not.toHaveBeenCalled();
     expect(interaction.followUp).not.toHaveBeenCalled();
     expect(getSignups(db, event.id)).toHaveLength(1);
+  });
+
+  test('prompts to add another when the postcreate flow signs someone up successfully', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+      content: '已幫 IceGuy 卡位，要繼續加人嗎？',
+      ephemeral: true,
+    }));
+    const prompt = interaction.followUp.mock.calls[0][0];
+    expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
+    expect(prompt.components[0].components[1].data.custom_id).toBe('postcreate-assist-done');
+  });
+
+  test('does not prompt to add another when invoked from the always-on 代報名 button (no flow)', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    const editedMessage = { edit: jest.fn(async () => {}) };
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      fetchedMessage: editedMessage,
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.followUp).not.toHaveBeenCalled();
   });
 
   test('includes the note segment in the thread message when provided', async () => {

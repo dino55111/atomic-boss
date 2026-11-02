@@ -150,6 +150,21 @@ describe('handleCreateEventModal', () => {
     expect(event.capacity).toBe(12);
   });
 
+  test('follows up with an ephemeral prompt offering to pre-fill members, scoped to the new event', async () => {
+    const db = initDb(':memory:');
+    const interaction = makeInteraction({ title: '普拉' });
+
+    await handleCreateEventModal(interaction, db, FIXED_NOW);
+
+    const event = getEventById(db, 1);
+    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+      content: '揪團已建立！要先幫人卡位嗎？',
+      ephemeral: true,
+    }));
+    const prompt = interaction.followUp.mock.calls[0][0];
+    expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
+  });
+
   test('still creates the event and posts the embed when the interaction ack fails (stale interaction)', async () => {
     const db = initDb(':memory:');
     const interaction = makeInteraction({ title: '普拉', deferUpdateFails: true });

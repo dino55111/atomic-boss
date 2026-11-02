@@ -32,6 +32,8 @@ function makeHandlers(overrides = {}) {
     handleCancelEventButton: jest.fn(),
     handleCancelEventConfirmButton: jest.fn(),
     handleCancelEventAbortButton: jest.fn(),
+    handlePostCreateAssistSkipButton: jest.fn(),
+    handlePostCreateAssistDoneButton: jest.fn(),
     ...overrides,
   };
 }
@@ -225,6 +227,26 @@ describe('createInteractionHandler', () => {
     await handle(interaction);
 
     expect(handleCancelEventAbortButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes postcreate-assist-skip button clicks to handlePostCreateAssistSkipButton', async () => {
+    const handlePostCreateAssistSkipButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handlePostCreateAssistSkipButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'postcreate-assist-skip' });
+
+    await handle(interaction);
+
+    expect(handlePostCreateAssistSkipButton).toHaveBeenCalledWith(interaction);
+  });
+
+  test('routes postcreate-assist-done button clicks to handlePostCreateAssistDoneButton', async () => {
+    const handlePostCreateAssistDoneButton = jest.fn(async () => {});
+    const handle = createInteractionHandler(makeHandlers({ handlePostCreateAssistDoneButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'postcreate-assist-done' });
+
+    await handle(interaction);
+
+    expect(handlePostCreateAssistDoneButton).toHaveBeenCalledWith(interaction);
   });
 
   test('routes edit-time-modal submissions to handleEditTimeModal with the db', async () => {

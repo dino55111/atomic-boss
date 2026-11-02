@@ -15,16 +15,25 @@ const { getOptionalTextInputValue, isValidLevel } = require('./join-modal');
 const { buildClassButtonRowsForCustomIds } = require('./signup-button');
 
 const EXTERNAL_TARGET = 'external';
+const POSTCREATE_FLOW = 'postcreate';
 
-function buildAssistTargetPickerRows(eventId) {
+// Appends ":flow" to a customId when a flow is given, so the same assist
+// chain (picker -> class -> modal) can tell apart "triggered from the
+// always-on 代報名 button" from "triggered right after /boss created the
+// event", without duplicating any of its signup logic.
+function withFlow(customId, flow) {
+  return flow ? `${customId}:${flow}` : customId;
+}
+
+function buildAssistTargetPickerRows(eventId, flow) {
   const userSelect = new UserSelectMenuBuilder()
-    .setCustomId(`assist-user-select:${eventId}`)
+    .setCustomId(withFlow(`assist-user-select:${eventId}`, flow))
     .setPlaceholder('選擇伺服器成員')
     .setMinValues(1)
     .setMaxValues(1);
 
   const externalButton = new ButtonBuilder()
-    .setCustomId(`assist-external:${eventId}`)
+    .setCustomId(withFlow(`assist-external:${eventId}`, flow))
     .setLabel('好友沒有 Discord 帳號')
     .setStyle(ButtonStyle.Secondary);
 
@@ -34,13 +43,15 @@ function buildAssistTargetPickerRows(eventId) {
   ];
 }
 
-function buildAssistClassButtonRows(eventId, target) {
-  return buildClassButtonRowsForCustomIds((className) => `assist-class-choice:${eventId}:${target}:${className}`);
+function buildAssistClassButtonRows(eventId, target, flow) {
+  return buildClassButtonRowsForCustomIds((className) =>
+    withFlow(`assist-class-choice:${eventId}:${target}:${className}`, flow),
+  );
 }
 
-function buildAssistJoinModal(eventId, target, className) {
+function buildAssistJoinModal(eventId, target, className, flow) {
   const modal = new ModalBuilder()
-    .setCustomId(`assist-join-modal:${eventId}:${target}:${className}`)
+    .setCustomId(withFlow(`assist-join-modal:${eventId}:${target}:${className}`, flow))
     .setTitle(`代報名（${className}）`);
 
   const rows = [];
@@ -89,34 +100,75 @@ function buildAssistJoinModal(eventId, target, className) {
 }
 
 async function handleAssistButton(interaction) {
-  const eventId = interaction.customId.split(':')[1];
+  const [, eventId, flow] = interaction.customId.split(':');
   await interaction.reply({
     content: '請選擇要代報名的對象：',
-    components: buildAssistTargetPickerRows(eventId),
+    components: buildAssistTargetPickerRows(eventId, flow),
     ephemeral: true,
   });
 }
 
 async function handleAssistUserSelect(interaction) {
-  const eventId = interaction.customId.split(':')[1];
+  const [, eventId, flow] = interaction.customId.split(':');
   const targetUserId = interaction.values[0];
   await interaction.update({
     content: '請選擇職業：',
-    components: buildAssistClassButtonRows(eventId, targetUserId),
+    components: buildAssistClassButtonRows(eventId, targetUserId, flow),
   });
 }
 
 async function handleAssistExternalButton(interaction) {
-  const eventId = interaction.customId.split(':')[1];
+  const [, eventId, flow] = interaction.customId.split(':');
   await interaction.update({
     content: '請選擇職業：',
-    components: buildAssistClassButtonRows(eventId, EXTERNAL_TARGET),
+    components: buildAssistClassButtonRows(eventId, EXTERNAL_TARGET, flow),
   });
 }
 
 async function handleAssistClassChoiceButton(interaction) {
-  const [, eventId, target, className] = interaction.customId.split(':');
-  await interaction.showModal(buildAssistJoinModal(eventId, target, className));
+  const [, eventId, target, className, flow] = interaction.customId.split(':');
+  await interaction.showModal(buildAssistJoinModal(eventId, target, className, flow));
+}
+
+// Shown right after /boss creates and posts the event (see
+// create-event-modal.js), so the creator can pre-fill known members before
+// anyone else sees the signup card.
+function buildPostCreateAssistPromptRow(eventId) {
+  const assistButton = new ButtonBuilder()
+    .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
+    .setLabel('幫人卡位')
+    .setStyle(ButtonStyle.Secondary);
+
+  const skipButton = new ButtonBuilder()
+    .setCustomId('postcreate-assist-skip')
+    .setLabel('不用')
+    .setStyle(ButtonStyle.Secondary);
+
+  return new ActionRowBuilder().addComponents(assistButton, skipButton);
+}
+
+// Shown after each successful postcreate-flow signup so the creator can
+// loop back into the same assist chain for the next person.
+function buildContinueOrDoneRow(eventId) {
+  const continueButton = new ButtonBuilder()
+    .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
+    .setLabel('再加一個')
+    .setStyle(ButtonStyle.Secondary);
+
+  const doneButton = new ButtonBuilder()
+    .setCustomId('postcreate-assist-done')
+    .setLabel('完成')
+    .setStyle(ButtonStyle.Secondary);
+
+  return new ActionRowBuilder().addComponents(continueButton, doneButton);
+}
+
+async function handlePostCreateAssistSkipButton(interaction) {
+  await interaction.update({ content: '好的，之後要卡位可以在訊息上按「代報名」', components: [] });
+}
+
+async function handlePostCreateAssistDoneButton(interaction) {
+  await interaction.update({ content: '好的，卡位完成！', components: [] });
 }
 
 function generateExternalUserId() {
@@ -133,7 +185,7 @@ async function fetchDisplayName(client, target) {
 }
 
 async function handleAssistJoinModal(interaction, db) {
-  const [, eventIdRaw, target, className] = interaction.customId.split(':');
+  const [, eventIdRaw, target, className, flow] = interaction.customId.split(':');
   const eventId = Number.parseInt(eventIdRaw, 10);
   const event = getEventById(db, eventId);
 
@@ -199,16 +251,29 @@ async function handleAssistJoinModal(interaction, db) {
     content: `${nameSegment} 已報名（職業：${className}／等級：${level}／ID：${gameId}${noteSegment}），由 <@${interaction.user.id}> 代為報名`,
     allowedMentions: { users: mentionableUserIds },
   });
+
+  if (acked && flow === POSTCREATE_FLOW) {
+    await interaction.followUp({
+      content: `已幫 ${displayName} 卡位，要繼續加人嗎？`,
+      components: [buildContinueOrDoneRow(event.id)],
+      ephemeral: true,
+    });
+  }
 }
 
 module.exports = {
   EXTERNAL_TARGET,
+  POSTCREATE_FLOW,
   buildAssistTargetPickerRows,
   buildAssistClassButtonRows,
   buildAssistJoinModal,
+  buildPostCreateAssistPromptRow,
+  buildContinueOrDoneRow,
   handleAssistButton,
   handleAssistUserSelect,
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handlePostCreateAssistSkipButton,
+  handlePostCreateAssistDoneButton,
 };

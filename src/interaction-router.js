@@ -19,6 +19,8 @@ function createInteractionHandler({
   handleCancelEventButton,
   handleCancelEventConfirmButton,
   handleCancelEventAbortButton,
+  handlePostCreateAssistSkipButton,
+  handlePostCreateAssistDoneButton,
 }) {
   return async function handleInteraction(interaction) {
     if (interaction.isChatInputCommand()) {
@@ -48,6 +50,8 @@ function createInteractionHandler({
       if (action === 'cancel-event') await handleCancelEventButton(interaction, db);
       if (action === 'cancel-event-confirm') await handleCancelEventConfirmButton(interaction, db);
       if (action === 'cancel-event-abort') await handleCancelEventAbortButton(interaction);
+      if (action === 'postcreate-assist-skip') await handlePostCreateAssistSkipButton(interaction);
+      if (action === 'postcreate-assist-done') await handlePostCreateAssistDoneButton(interaction);
       return;
     }
 
