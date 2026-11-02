@@ -3,7 +3,6 @@ const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embe
 const { TITLE_CAPACITIES } = require('../commands/create-event');
 const { tryAcknowledgeAndDeleteReply } = require('./ack');
 const { buildPostCreateAssistPromptRow } = require('./assist-signup');
-const { registerPostCreatePrompt, deletePostCreatePrompts } = require('./postcreate-prompts');
 const { START_TIME_PATTERN, resolveStartDateTime, formatStartTimeWithWeekday } = require('../start-time');
 
 const NOT_FOUND_MESSAGE = '找不到這個揪團，可能已經被刪除了';
@@ -109,12 +108,11 @@ async function handleCreateEventModal(interaction, db, now = new Date()) {
     return;
   }
 
-  const prompt = await interaction.followUp({
+  await interaction.followUp({
     content: '揪團資料已建立，要先幫人卡位再發布嗎？',
     components: [buildPostCreateAssistPromptRow(event.id)],
     ephemeral: true,
   });
-  registerPostCreatePrompt(event.id, interaction.webhook, prompt.id);
 }
 
 async function handlePostCreatePublishButton(interaction, db) {
@@ -134,8 +132,13 @@ async function handlePostCreatePublishButton(interaction, db) {
     return;
   }
 
+  // The pre-fill flow keeps reusing one ephemeral message end-to-end (see
+  // assist-signup.js's handleAssistButton/handleAssistJoinModal) rather than
+  // replacing it each step, so there's only ever this one message to drop —
+  // same deferUpdate()+deleteReply() pattern ack.js uses for a modal's
+  // origin message.
   await interaction.deferUpdate();
-  await deletePostCreatePrompts(event.id);
+  await interaction.deleteReply();
   await publishEvent(interaction.channel, db, event);
 }
 

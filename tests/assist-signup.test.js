@@ -13,7 +13,6 @@ const {
   handleAssistJoinModal,
 } = require('../src/interactions/assist-signup');
 const { CLASS_OPTIONS } = require('../src/interactions/signup-button');
-const { deletePostCreatePrompts } = require('../src/interactions/postcreate-prompts');
 
 describe('buildAssistTargetPickerRows', () => {
   test('returns a user-select row and an external-friend button row', () => {
@@ -98,12 +97,16 @@ describe('handleAssistButton', () => {
     expect(replyPayload.components[0].components[0].data.custom_id).toBe('assist-user-select:42');
   });
 
-  test('forwards the flow suffix from its own customId into the target-picker customIds', async () => {
-    const interaction = { customId: 'assist:42:postcreate', reply: jest.fn(async () => {}) };
+  // The postcreate flow reuses its own ephemeral message end-to-end instead
+  // of replying with a new one at each step (see the module docstring), so
+  // its "幫人卡位"/"再加一個" click edits the message it's already on.
+  test('edits its own message into the target-picker when triggered from the postcreate flow', async () => {
+    const interaction = { customId: 'assist:42:postcreate', update: jest.fn(async () => {}) };
     await handleAssistButton(interaction);
 
-    const replyPayload = interaction.reply.mock.calls[0][0];
-    expect(replyPayload.components[0].components[0].data.custom_id).toBe('assist-user-select:42:postcreate');
+    expect(interaction.update).toHaveBeenCalledTimes(1);
+    const payload = interaction.update.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe('assist-user-select:42:postcreate');
   });
 });
 
@@ -215,8 +218,8 @@ function makeAssistModalInteraction({ customId, helperId, fieldValues, fetchedUs
     },
     deferUpdate: jest.fn(async () => {}),
     deleteReply: jest.fn(async () => {}),
-    followUp: jest.fn(async () => ({ id: 'prompt-message-1' })),
-    webhook: { deleteMessage: jest.fn(async () => {}) },
+    editReply: jest.fn(async () => {}),
+    followUp: jest.fn(async () => {}),
     channel,
     client: {
       channels: { fetch: jest.fn(async (id) => (id === 'thread-1' ? thread : channel)) },
@@ -438,7 +441,10 @@ describe('handleAssistJoinModal', () => {
     expect(getSignups(db, event.id)).toHaveLength(1);
   });
 
-  test('prompts to add another when the postcreate flow signs someone up successfully, before the event is published', async () => {
+  // Keeps the ack to a defer (no deleteReply) and edits that same message
+  // into the continue/publish prompt — see handleAssistButton's docstring —
+  // instead of deleting it and posting a brand new followUp each time.
+  test('edits its own message into a continue/publish prompt when the postcreate flow signs someone up successfully, before the event is published', async () => {
     const db = initDb(':memory:');
     const event = makeUnpublishedEvent(db);
     const thread = { send: jest.fn(async () => {}) };
@@ -452,31 +458,14 @@ describe('handleAssistJoinModal', () => {
 
     await handleAssistJoinModal(interaction, db);
 
-    expect(interaction.followUp).toHaveBeenCalledWith(expect.objectContaining({
+    expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
+    expect(interaction.editReply).toHaveBeenCalledWith(expect.objectContaining({
       content: '已幫 IceGuy 卡位，要繼續加人嗎？',
-      ephemeral: true,
     }));
-    const prompt = interaction.followUp.mock.calls[0][0];
-    expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
-    expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
-  });
-
-  test('registers the continue/publish prompt (via its own webhook) so it gets deleted once the event is published', async () => {
-    const db = initDb(':memory:');
-    const event = makeUnpublishedEvent(db);
-    const interaction = makeAssistModalInteraction({
-      customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
-      helperId: 'helper-1',
-      fieldValues: { level: '70', game_id: 'ice#1' },
-      fetchedUser: { username: 'IceGuy' },
-      thread: { send: jest.fn(async () => {}) },
-    });
-    interaction.followUp = jest.fn(async () => ({ id: 'prompt-message-1' }));
-
-    await handleAssistJoinModal(interaction, db);
-    await deletePostCreatePrompts(event.id);
-
-    expect(interaction.webhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
+    const payload = interaction.editReply.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
+    expect(payload.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
   });
 
   test('does not touch any announcement message or thread when the event has not been published yet', async () => {

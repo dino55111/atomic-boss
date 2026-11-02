@@ -6,7 +6,6 @@ const {
   publishEvent,
   handlePostCreatePublishButton,
 } = require('../src/interactions/create-event-modal');
-const { registerPostCreatePrompt } = require('../src/interactions/postcreate-prompts');
 
 function makeChannel() {
   const thread = { id: 'thread-1', send: jest.fn(async () => ({ id: 'thread-message-1' })) };
@@ -33,8 +32,7 @@ function makeInteraction({ title, session = 1, date = '7/12', hour = '20', minut
       }
     }),
     deleteReply: jest.fn(async () => {}),
-    followUp: jest.fn(async () => ({ id: 'prompt-message-1' })),
-    webhook: { deleteMessage: jest.fn(async () => {}) },
+    followUp: jest.fn(async () => {}),
     channel,
   };
 }
@@ -142,23 +140,6 @@ describe('handleCreateEventModal', () => {
     const prompt = interaction.followUp.mock.calls[0][0];
     expect(prompt.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
     expect(prompt.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
-  });
-
-  test('registers the pre-fill prompt (via its own webhook) so it gets deleted once the event is published', async () => {
-    const db = initDb(':memory:');
-    const interaction = makeInteraction({ title: '普拉' });
-    interaction.followUp = jest.fn(async () => ({ id: 'prompt-message-1' }));
-
-    await handleCreateEventModal(interaction, db, FIXED_NOW);
-
-    const event = getEventById(db, 1);
-    const publishChannel = makeChannel();
-    await handlePostCreatePublishButton(
-      { customId: `postcreate-publish:${event.id}`, channel: publishChannel, deferUpdate: jest.fn(async () => {}) },
-      db,
-    );
-
-    expect(interaction.webhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
   });
 
   // The event itself, and publishing it, must not depend on this
@@ -276,23 +257,26 @@ describe('handlePostCreatePublishButton', () => {
       customId: `postcreate-publish:${eventId}`,
       channel,
       deferUpdate: jest.fn(async () => {}),
+      deleteReply: jest.fn(async () => {}),
       update: jest.fn(async () => {}),
     };
   }
 
-  test('publishes the event, acks the button, and deletes any registered pre-fill prompts', async () => {
+  // The pre-fill flow keeps reusing one ephemeral message end-to-end (see
+  // assist-signup.js's handleAssistButton/handleAssistJoinModal), so 發布
+  // just deletes that same message via its own deferUpdate()+deleteReply()
+  // — same mechanism ack.js already uses to drop a modal's origin message.
+  test('publishes the event and deletes its own prompt message', async () => {
     const db = initDb(':memory:');
     const event = makeUnpublishedEvent(db);
     const channel = makeChannel();
     const interaction = makeButtonInteraction({ eventId: event.id, channel });
-    const promptWebhook = { deleteMessage: jest.fn(async () => {}) };
-    registerPostCreatePrompt(event.id, promptWebhook, 'prompt-message-1');
 
     await handlePostCreatePublishButton(interaction, db);
 
     expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
+    expect(interaction.deleteReply).toHaveBeenCalledTimes(1);
     expect(channel.send).toHaveBeenCalledTimes(1);
-    expect(promptWebhook.deleteMessage).toHaveBeenCalledWith('prompt-message-1');
     expect(getEventById(db, event.id).message_id).toBe('message-1');
   });
 

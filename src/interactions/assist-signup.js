@@ -10,10 +10,9 @@ const {
 } = require('discord.js');
 const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
 const { updateEventAnnouncement } = require('../embeds/event-embed');
-const { tryAcknowledgeAndDeleteReply } = require('./ack');
+const { tryAcknowledgeAndDeleteReply, tryAcknowledgeKeepMessage } = require('./ack');
 const { getOptionalTextInputValue, isValidLevel } = require('./join-modal');
 const { buildClassButtonRowsForCustomIds } = require('./signup-button');
-const { registerPostCreatePrompt } = require('./postcreate-prompts');
 
 const EXTERNAL_TARGET = 'external';
 const POSTCREATE_FLOW = 'postcreate';
@@ -102,11 +101,22 @@ function buildAssistJoinModal(eventId, target, className, flow) {
 
 async function handleAssistButton(interaction) {
   const [, eventId, flow] = interaction.customId.split(':');
-  await interaction.reply({
+  const payload = {
     content: '請選擇要代報名的對象：',
     components: buildAssistTargetPickerRows(eventId, flow),
-    ephemeral: true,
-  });
+  };
+
+  // The postcreate flow reuses its own ephemeral message end-to-end rather
+  // than replying with a new one each step (see buildPostCreateAssistPromptRow
+  // and the postcreate branch of handleAssistJoinModal below) — update()
+  // edits the message this button is already on, in place. The always-on
+  // 代報名 button lives on the public signup card itself, which can't be
+  // turned ephemeral in place, so that path still replies with a new message.
+  if (flow === POSTCREATE_FLOW) {
+    await interaction.update(payload);
+  } else {
+    await interaction.reply({ ...payload, ephemeral: true });
+  }
 }
 
 async function handleAssistUserSelect(interaction) {
@@ -183,10 +193,16 @@ async function handleAssistJoinModal(interaction, db) {
   const [, eventIdRaw, target, className, flow] = interaction.customId.split(':');
   const eventId = Number.parseInt(eventIdRaw, 10);
   const event = getEventById(db, eventId);
+  const isPostCreate = flow === POSTCREATE_FLOW;
 
   // Same reasoning as handleJoinModal: the signup itself doesn't depend on
   // this interaction's token, so it must be recorded even if the ack fails.
-  const acked = await tryAcknowledgeAndDeleteReply(interaction);
+  // The postcreate flow keeps reusing its one message across the whole
+  // pre-fill loop (see handleAssistButton), so its ack only defers — the
+  // message gets edited into the next prompt below instead of deleted.
+  const acked = isPostCreate
+    ? await tryAcknowledgeKeepMessage(interaction)
+    : await tryAcknowledgeAndDeleteReply(interaction);
 
   if (!event) {
     if (acked) {
@@ -252,13 +268,11 @@ async function handleAssistJoinModal(interaction, db) {
     });
   }
 
-  if (acked && flow === POSTCREATE_FLOW) {
-    const prompt = await interaction.followUp({
+  if (acked && isPostCreate) {
+    await interaction.editReply({
       content: `已幫 ${displayName} 卡位，要繼續加人嗎？`,
       components: [buildContinueOrPublishRow(event.id)],
-      ephemeral: true,
     });
-    registerPostCreatePrompt(event.id, interaction.webhook, prompt.id);
   }
 }
 
