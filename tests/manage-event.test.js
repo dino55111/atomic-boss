@@ -386,6 +386,7 @@ describe('handleCancelEventConfirmButton', () => {
     return {
       customId: `cancel-event-confirm:${eventId}`,
       update: jest.fn(async () => {}),
+      editReply: jest.fn(async () => {}),
       client: { channels: { fetch: jest.fn(async (id) => channelsById[id]) } },
     };
   }
@@ -413,6 +414,24 @@ describe('handleCancelEventConfirmButton', () => {
     const updated = getEventById(db, event.id);
     expect(updated.cleaned_at).not.toBeNull();
     expect(updated.reminded_at).not.toBeNull();
+  });
+
+  // Without this, the ephemeral confirmation is left showing "正在取消揪團…"
+  // forever — the cancellation itself finishes instantly, but nothing ever
+  // tells the creator it's done, making it look stuck even though it worked.
+  test('confirms completion once cleanup finishes, replacing the "正在取消" placeholder', async () => {
+    const db = initDb(':memory:');
+    const event = makeEvent(db);
+    updateEventThreadId(db, event.id, 'thread-1');
+
+    const message = { delete: jest.fn(async () => {}) };
+    const channel = { messages: { fetch: jest.fn(async () => message) } };
+    const thread = { send: jest.fn(async () => {}), delete: jest.fn(async () => {}) };
+    const interaction = makeCancelInteraction(event.id, { 'channel-1': channel, 'thread-1': thread });
+
+    await handleCancelEventConfirmButton(interaction, db);
+
+    expect(interaction.editReply).toHaveBeenCalledWith({ content: '揪團已取消', components: [] });
   });
 
   test('does not overwrite an already-set reminded_at', async () => {

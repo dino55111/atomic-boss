@@ -238,6 +238,11 @@ async function handleCancelEventConfirmButton(interaction, db) {
   if (!event.reminded_at) {
     markEventReminded(db, event.id, cancelledAt);
   }
+
+  // Without this, the "正在取消揪團…" placeholder from the ack above is
+  // never replaced — cleanup above finishes instantly, but nothing ever
+  // tells the creator it's done, making it look stuck even though it worked.
+  await interaction.editReply({ content: '揪團已取消', components: [] });
 }
 
 module.exports = {
