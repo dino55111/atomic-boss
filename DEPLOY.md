@@ -36,6 +36,12 @@
    ```
    沒設這個變數的話這個限制就不會啟用。啟用後記得確認 bot 的角色在該頻道有「管理訊息」(Manage Messages) 權限，不然刪不掉別人的訊息。
 
+   如果要啟用「新成員加入時發歡迎訊息」的功能，另外設：
+   ```
+   fly secrets set WELCOME_CHANNEL_ID=要發送歡迎訊息的頻道id WELCOME_EXCLUDED_ROLE_ID=要排除的身份組id
+   ```
+   沒設 `WELCOME_CHANNEL_ID` 的話這個功能就不會啟用。這個功能需要 Discord 的「Server Members Intent」特權意圖，記得先去 [Discord Developer Portal](https://discord.com/developers/applications) → 選你的機器人 → Bot 頁面 → 打開「SERVER MEMBERS INTENT」開關，否則 bot 會連線失敗。
+
 5. **部署**
    ```
    fly deploy

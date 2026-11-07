@@ -31,6 +31,7 @@ const { createInteractionHandler } = require('./interaction-router');
 const { checkAndSendReminders, REMINDER_POLL_INTERVAL_MS } = require('./reminders');
 const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup');
 const { createMessageCreateHandler } = require('./command-only-channel');
+const { createGuildMemberAddHandler } = require('./welcome-member');
 
 // DB_PATH lets a deployment point the SQLite file at a mounted persistent
 // volume (e.g. Fly.io's /data) instead of the repo-relative default used
@@ -66,9 +67,18 @@ const handleInteraction = createInteractionHandler({
 });
 
 // GuildMessages is only needed for the command-only-channel enforcement
-// below (messageCreate); nothing else here reads channel messages.
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages] });
+// below (messageCreate); GuildMembers is needed to read a joining member's
+// roles in the welcome handler below (requires the privileged "Server
+// Members Intent" to be enabled for this bot in the Discord Developer
+// Portal, or the client fails to log in).
+const client = new Client({
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers],
+});
 const handleMessageCreate = createMessageCreateHandler(process.env.COMMAND_ONLY_CHANNEL_ID);
+const handleGuildMemberAdd = createGuildMemberAddHandler(
+  process.env.WELCOME_CHANNEL_ID,
+  process.env.WELCOME_EXCLUDED_ROLE_ID,
+);
 
 let reminderPollInFlight = false;
 let cleanupPollInFlight = false;
@@ -108,6 +118,12 @@ client.on(Events.InteractionCreate, (interaction) => {
 client.on(Events.MessageCreate, (message) => {
   handleMessageCreate(message).catch((error) => {
     console.error('Error enforcing command-only channel:', error);
+  });
+});
+
+client.on(Events.GuildMemberAdd, (member) => {
+  handleGuildMemberAdd(member).catch((error) => {
+    console.error('Error sending welcome message:', error);
   });
 });
 
