@@ -461,11 +461,32 @@ describe('handleAssistJoinModal', () => {
     expect(interaction.deferUpdate).toHaveBeenCalledTimes(1);
     expect(interaction.deleteReply).not.toHaveBeenCalled();
     expect(interaction.editReply).toHaveBeenCalledWith(expect.objectContaining({
-      content: '已幫 IceGuy 卡位，要繼續加人嗎？',
+      content: '已幫 IceGuy 報名，要繼續加人嗎？\n\n目前報名名單：\n1. IceGuy（冰雷／等級：70／ID：ice#1）',
     }));
     const payload = interaction.editReply.mock.calls[0][0];
     expect(payload.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
     expect(payload.components[0].components[1].data.custom_id).toBe(`postcreate-publish:${event.id}`);
+  });
+
+  test('lists everyone pre-filled so far, not just the one just added, in the continue/publish prompt', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '80', gameId: 'Hua123' });
+    const thread = { send: jest.fn(async () => {}) };
+    const interaction = makeAssistModalInteraction({
+      customId: `assist-join-modal:${event.id}:user-9:冰雷:postcreate`,
+      helperId: 'helper-1',
+      fieldValues: { level: '70', game_id: 'ice#1' },
+      fetchedUser: { username: 'IceGuy' },
+      thread,
+    });
+
+    await handleAssistJoinModal(interaction, db);
+
+    expect(interaction.editReply).toHaveBeenCalledWith(expect.objectContaining({
+      content:
+        '已幫 IceGuy 報名，要繼續加人嗎？\n\n目前報名名單：\n1. Alice（戰士／等級：80／ID：Hua123）\n2. IceGuy（冰雷／等級：70／ID：ice#1）',
+    }));
   });
 
   test('does not touch any announcement message or thread when the event has not been published yet', async () => {

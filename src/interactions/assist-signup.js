@@ -176,6 +176,14 @@ function buildContinueOrPublishRow(eventId) {
   return new ActionRowBuilder().addComponents(continueButton, publishButton);
 }
 
+// Shown in the postcreate flow's continue/publish prompt so the creator can
+// see everyone pre-filled so far, not just the one they just added.
+function formatRosterList(signups) {
+  return signups
+    .map((s, i) => `${i + 1}. ${s.display_name}（${s.class}／等級：${s.level}／ID：${s.game_id}）`)
+    .join('\n');
+}
+
 function generateExternalUserId() {
   return `ext:${crypto.randomUUID()}`;
 }
@@ -249,11 +257,12 @@ async function handleAssistJoinModal(interaction, db) {
     return;
   }
 
+  const signups = getSignups(db, event.id);
+
   // Before the event is published (see create-event-modal.js), there's no
   // announcement message or thread yet to update/notify — the roster just
   // accumulates in the DB and shows up fully formed once it's posted.
   if (event.thread_id) {
-    const signups = getSignups(db, event.id);
     await updateEventAnnouncement(interaction.client, event, signups);
 
     const nameSegment = isExternal ? `**${displayName}**` : `<@${userId}>`;
@@ -270,7 +279,7 @@ async function handleAssistJoinModal(interaction, db) {
 
   if (acked && isPostCreate) {
     await interaction.editReply({
-      content: `已幫 ${displayName} 卡位，要繼續加人嗎？`,
+      content: `已幫 ${displayName} 報名，要繼續加人嗎？\n\n目前報名名單：\n${formatRosterList(signups)}`,
       components: [buildContinueOrPublishRow(event.id)],
     });
   }
