@@ -14,11 +14,21 @@ ${mention}
 
 function createGuildMemberAddHandler(welcomeChannelId, excludedRoleId) {
   return async function handleGuildMemberAdd(member) {
-    if (!welcomeChannelId || member.roles.cache.has(excludedRoleId)) {
+    console.log(`[welcome] guildMemberAdd for ${member.id}`);
+
+    if (!welcomeChannelId) {
+      console.log('[welcome] skipped: no welcomeChannelId configured');
+      return;
+    }
+    if (member.roles.cache.has(excludedRoleId)) {
+      console.log(`[welcome] skipped: ${member.id} has the excluded role`);
       return;
     }
 
-    const channel = await member.client.channels.fetch(welcomeChannelId).catch(() => null);
+    const channel = await member.client.channels.fetch(welcomeChannelId).catch((error) => {
+      console.error('[welcome] failed to fetch welcome channel:', error);
+      return null;
+    });
     if (!channel) {
       return;
     }
@@ -28,7 +38,8 @@ function createGuildMemberAddHandler(welcomeChannelId, excludedRoleId) {
         content: WELCOME_MESSAGE_TEMPLATE(`<@${member.id}>`),
         allowedMentions: { users: [member.id] },
       })
-      .catch(() => {});
+      .then(() => console.log('[welcome] message sent'))
+      .catch((error) => console.error('[welcome] failed to send message:', error));
   };
 }
 
