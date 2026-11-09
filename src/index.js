@@ -34,6 +34,7 @@ const { checkAndSendReminders, REMINDER_POLL_INTERVAL_MS } = require('./reminder
 const { checkAndCleanupEvents, CLEANUP_POLL_INTERVAL_MS } = require('./cleanup');
 const { createMessageCreateHandler } = require('./command-only-channel');
 const { createGuildMemberAddHandler } = require('./welcome-member');
+const { createVerificationMessageHandler } = require('./verification-message');
 
 // DB_PATH lets a deployment point the SQLite file at a mounted persistent
 // volume (e.g. Fly.io's /data) instead of the repo-relative default used
@@ -74,14 +75,26 @@ const handleInteraction = createInteractionHandler({
 // below (messageCreate); GuildMembers is needed to read a joining member's
 // roles in the welcome handler below (requires the privileged "Server
 // Members Intent" to be enabled for this bot in the Discord Developer
-// Portal, or the client fails to log in).
+// Portal, or the client fails to log in). MessageContent is needed by the
+// verification handler to read message.content — without it, Discord sends
+// an empty content for guild messages that don't mention the bot (also a
+// privileged intent that must be toggled on in the Developer Portal).
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.MessageContent,
+  ],
 });
 const handleMessageCreate = createMessageCreateHandler(process.env.COMMAND_ONLY_CHANNEL_ID);
 const handleGuildMemberAdd = createGuildMemberAddHandler(
   process.env.WELCOME_CHANNEL_ID,
   process.env.WELCOME_EXCLUDED_ROLE_ID,
+);
+const handleVerificationMessage = createVerificationMessageHandler(
+  process.env.VERIFICATION_CHANNEL_ID,
+  process.env.VERIFICATION_ROLE_ID,
 );
 
 let reminderPollInFlight = false;
@@ -122,6 +135,18 @@ client.on(Events.InteractionCreate, (interaction) => {
 client.on(Events.MessageCreate, (message) => {
   handleMessageCreate(message).catch((error) => {
     console.error('Error enforcing command-only channel:', error);
+  });
+  handleVerificationMessage(message).catch((error) => {
+    console.error('Error handling verification message:', error);
+  });
+});
+
+// A member can post the registration template, get it wrong, then edit it
+// into shape — this catches that edit instead of forcing them to delete and
+// repost just to trigger the handler.
+client.on(Events.MessageUpdate, (oldMessage, newMessage) => {
+  handleVerificationMessage(newMessage).catch((error) => {
+    console.error('Error handling verification message:', error);
   });
 });
 
