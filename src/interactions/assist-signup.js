@@ -7,12 +7,21 @@ const {
   ButtonBuilder,
   ButtonStyle,
   UserSelectMenuBuilder,
+  StringSelectMenuBuilder,
 } = require('discord.js');
-const { getEventById, addSignup, getSignups, ADD_SIGNUP_FULL, ADD_SIGNUP_DUPLICATE } = require('../db/db');
+const {
+  getEventById,
+  addSignup,
+  getSignups,
+  getSignupById,
+  removeSignupById,
+  ADD_SIGNUP_FULL,
+  ADD_SIGNUP_DUPLICATE,
+} = require('../db/db');
 const { updateEventAnnouncement } = require('../embeds/event-embed');
 const { tryAcknowledgeAndDeleteReply, tryAcknowledgeKeepMessage } = require('./ack');
 const { getOptionalTextInputValue, isValidLevel } = require('./join-modal');
-const { buildClassButtonRowsForCustomIds } = require('./signup-button');
+const { buildClassButtonRowsForCustomIds, resolveCancelButtonName } = require('./signup-button');
 
 const EXTERNAL_TARGET = 'external';
 const POSTCREATE_FLOW = 'postcreate';
@@ -161,7 +170,8 @@ function buildPostCreateAssistPromptRow(eventId) {
 }
 
 // Shown after each successful postcreate-flow signup so the creator can
-// loop back into the same assist chain for the next person, or publish now.
+// loop back into the same assist chain for the next person, publish now, or
+// remove one of the people pre-filled so far.
 function buildContinueOrPublishRow(eventId) {
   const continueButton = new ButtonBuilder()
     .setCustomId(`assist:${eventId}:${POSTCREATE_FLOW}`)
@@ -173,7 +183,30 @@ function buildContinueOrPublishRow(eventId) {
     .setLabel('發布')
     .setStyle(ButtonStyle.Secondary);
 
-  return new ActionRowBuilder().addComponents(continueButton, publishButton);
+  const removeButton = new ButtonBuilder()
+    .setCustomId(`assist-remove:${eventId}`)
+    .setLabel('移除')
+    .setStyle(ButtonStyle.Secondary);
+
+  return new ActionRowBuilder().addComponents(continueButton, publishButton, removeButton);
+}
+
+// Lets the creator pick which pre-filled person to remove, from the roster
+// as it stands right now (one select menu entry per signup row). Labels show
+// each member's current server nickname rather than the name snapshotted at
+// signup time, same as the public cancel flow's choice buttons.
+async function buildRemoveSelectRow(eventId, signups, guild) {
+  const options = await Promise.all(signups.map(async (signup) => ({
+    label: `${await resolveCancelButtonName(signup, guild)}（${signup.class}）`.slice(0, 100),
+    value: String(signup.id),
+  })));
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`assist-remove-select:${eventId}`)
+    .setPlaceholder('選擇要移除的人')
+    .addOptions(options);
+
+  return new ActionRowBuilder().addComponents(select);
 }
 
 // Shown in the postcreate flow's continue/publish prompt so the creator can
@@ -285,6 +318,40 @@ async function handleAssistJoinModal(interaction, db) {
   }
 }
 
+// Triggered by the "移除" button in buildContinueOrPublishRow, before the
+// event is published — same reasoning as handleAssistButton for editing the
+// postcreate flow's own message in place rather than replying with a new one.
+async function handleAssistRemoveButton(interaction, db) {
+  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const signups = getSignups(db, eventId);
+  await interaction.update({
+    content: '請選擇要移除的人：',
+    components: [await buildRemoveSelectRow(eventId, signups, interaction.guild)],
+  });
+}
+
+async function handleAssistRemoveSelect(interaction, db) {
+  const eventId = Number.parseInt(interaction.customId.split(':')[1], 10);
+  const signupId = Number.parseInt(interaction.values[0], 10);
+  const removed = getSignupById(db, signupId);
+
+  removeSignupById(db, signupId);
+  const signups = getSignups(db, eventId);
+
+  if (signups.length === 0) {
+    await interaction.update({
+      content: '揪團資料已建立，要先預先報名再發布嗎？',
+      components: [buildPostCreateAssistPromptRow(eventId)],
+    });
+    return;
+  }
+
+  await interaction.update({
+    content: `已移除 ${removed.display_name}，要繼續加人嗎？\n\n目前報名名單：\n${formatRosterList(signups)}`,
+    components: [buildContinueOrPublishRow(eventId)],
+  });
+}
+
 module.exports = {
   EXTERNAL_TARGET,
   POSTCREATE_FLOW,
@@ -298,4 +365,6 @@ module.exports = {
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleAssistRemoveButton,
+  handleAssistRemoveSelect,
 };

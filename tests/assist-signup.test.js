@@ -11,6 +11,8 @@ const {
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleAssistRemoveButton,
+  handleAssistRemoveSelect,
 } = require('../src/interactions/assist-signup');
 const { CLASS_OPTIONS } = require('../src/interactions/signup-button');
 
@@ -83,6 +85,12 @@ describe('buildContinueOrPublishRow', () => {
     const row = buildContinueOrPublishRow(42);
     expect(row.components[0].data.custom_id).toBe('assist:42:postcreate');
     expect(row.components[1].data.custom_id).toBe('postcreate-publish:42');
+  });
+
+  test('also offers to remove one of the pre-filled signups', () => {
+    const row = buildContinueOrPublishRow(42);
+    expect(row.components[2].data.custom_id).toBe('assist-remove:42');
+    expect(row.components[2].data.label).toBe('移除');
   });
 });
 
@@ -548,5 +556,89 @@ describe('handleAssistJoinModal', () => {
     expect(thread.send).toHaveBeenCalledWith(expect.objectContaining({
       content: expect.stringContaining('備註：本尊的小號'),
     }));
+  });
+});
+
+describe('handleAssistRemoveButton', () => {
+  test('labels each option with the member\'s current server nickname, falling back to the stored name for external friends', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '80', gameId: 'Hua123' });
+    addSignup(db, event, {
+      userId: 'ext:1', displayName: '小明', className: '法師', level: '65', gameId: 'm#1', isExternal: true,
+    });
+    const [alice, xiaoming] = getSignups(db, event.id);
+    const guild = {
+      members: { fetch: jest.fn(async (userId) => (userId === 'user-1' ? { displayName: 'Alice 暱稱' } : null)) },
+    };
+    const interaction = { customId: `assist-remove:${event.id}`, guild, update: jest.fn(async () => {}) };
+
+    await handleAssistRemoveButton(interaction, db);
+
+    expect(interaction.update).toHaveBeenCalledTimes(1);
+    const payload = interaction.update.mock.calls[0][0];
+    const select = payload.components[0].components[0];
+    expect(select.data.custom_id).toBe(`assist-remove-select:${event.id}`);
+    expect(select.options.map((o) => o.data.label)).toEqual(['Alice 暱稱（戰士）', '小明（法師）']);
+    expect(select.options.map((o) => o.data.value)).toEqual([String(alice.id), String(xiaoming.id)]);
+  });
+
+  test('falls back to the stored signup name when the member can no longer be resolved', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '80', gameId: 'Hua123' });
+    const guild = { members: { fetch: jest.fn(async () => { throw new Error('Unknown Member'); }) } };
+    const interaction = { customId: `assist-remove:${event.id}`, guild, update: jest.fn(async () => {}) };
+
+    await handleAssistRemoveButton(interaction, db);
+
+    const payload = interaction.update.mock.calls[0][0];
+    const select = payload.components[0].components[0];
+    expect(select.options.map((o) => o.data.label)).toEqual(['Alice（戰士）']);
+  });
+});
+
+describe('handleAssistRemoveSelect', () => {
+  test('removes the chosen signup and shows the updated roster with the continue/publish row', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '80', gameId: 'Hua123' });
+    addSignup(db, event, { userId: 'user-2', displayName: 'Bob', className: '冰雷', level: '70', gameId: 'ice1' });
+    const [alice, bob] = getSignups(db, event.id);
+    const interaction = {
+      customId: `assist-remove-select:${event.id}`,
+      values: [String(alice.id)],
+      update: jest.fn(async () => {}),
+    };
+
+    await handleAssistRemoveSelect(interaction, db);
+
+    expect(getSignups(db, event.id)).toEqual([bob]);
+    expect(interaction.update).toHaveBeenCalledWith(expect.objectContaining({
+      content: '已移除 Alice，要繼續加人嗎？\n\n目前報名名單：\n1. Bob（冰雷／等級：70／ID：ice1）',
+    }));
+    const payload = interaction.update.mock.calls[0][0];
+    expect(payload.components[0].components[0].data.custom_id).toBe(`assist:${event.id}:postcreate`);
+    expect(payload.components[0].components[2].data.custom_id).toBe(`assist-remove:${event.id}`);
+  });
+
+  test('reverts to the initial 預先報名/直接發布 prompt when the last signup is removed', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    addSignup(db, event, { userId: 'user-1', displayName: 'Alice', className: '戰士', level: '80', gameId: 'Hua123' });
+    const [alice] = getSignups(db, event.id);
+    const interaction = {
+      customId: `assist-remove-select:${event.id}`,
+      values: [String(alice.id)],
+      update: jest.fn(async () => {}),
+    };
+
+    await handleAssistRemoveSelect(interaction, db);
+
+    expect(getSignups(db, event.id)).toEqual([]);
+    expect(interaction.update).toHaveBeenCalledWith({
+      content: '揪團資料已建立，要先預先報名再發布嗎？',
+      components: [buildPostCreateAssistPromptRow(event.id)],
+    });
   });
 });

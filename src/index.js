@@ -19,6 +19,8 @@ const {
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleAssistRemoveButton,
+  handleAssistRemoveSelect,
 } = require('./interactions/assist-signup');
 const {
   handleEditTimeButton,
@@ -58,6 +60,8 @@ const handleInteraction = createInteractionHandler({
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleAssistRemoveButton,
+  handleAssistRemoveSelect,
   handleEditTimeButton,
   handleEditTimeModal,
   handleCancelEventButton,

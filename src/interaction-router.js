@@ -14,6 +14,8 @@ function createInteractionHandler({
   handleAssistExternalButton,
   handleAssistClassChoiceButton,
   handleAssistJoinModal,
+  handleAssistRemoveButton,
+  handleAssistRemoveSelect,
   handleEditTimeButton,
   handleEditTimeModal,
   handleCancelEventButton,
@@ -34,6 +36,12 @@ function createInteractionHandler({
       return;
     }
 
+    if (interaction.isStringSelectMenu()) {
+      const [action] = interaction.customId.split(':');
+      if (action === 'assist-remove-select') await handleAssistRemoveSelect(interaction, db);
+      return;
+    }
+
     if (interaction.isButton()) {
       const [action] = interaction.customId.split(':');
       if (action === 'signup') await handleSignupButton(interaction);
@@ -45,6 +53,7 @@ function createInteractionHandler({
       if (action === 'assist') await handleAssistButton(interaction);
       if (action === 'assist-external') await handleAssistExternalButton(interaction);
       if (action === 'assist-class-choice') await handleAssistClassChoiceButton(interaction);
+      if (action === 'assist-remove') await handleAssistRemoveButton(interaction, db);
       if (action === 'edit-time') await handleEditTimeButton(interaction, db);
       if (action === 'cancel-event') await handleCancelEventButton(interaction, db);
       if (action === 'cancel-event-confirm') await handleCancelEventConfirmButton(interaction, db);

@@ -4,6 +4,7 @@ function makeBaseInteraction(overrides = {}) {
   return {
     isChatInputCommand: () => false,
     isUserSelectMenu: () => false,
+    isStringSelectMenu: () => false,
     isButton: () => false,
     isModalSubmit: () => false,
     ...overrides,
@@ -27,6 +28,8 @@ function makeHandlers(overrides = {}) {
     handleAssistExternalButton: jest.fn(),
     handleAssistClassChoiceButton: jest.fn(),
     handleAssistJoinModal: jest.fn(),
+    handleAssistRemoveButton: jest.fn(),
+    handleAssistRemoveSelect: jest.fn(),
     handleEditTimeButton: jest.fn(),
     handleEditTimeModal: jest.fn(),
     handleCancelEventButton: jest.fn(),
@@ -237,6 +240,28 @@ describe('createInteractionHandler', () => {
     await handle(interaction);
 
     expect(handlePostCreatePublishButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes assist-remove button clicks to handleAssistRemoveButton with the db', async () => {
+    const handleAssistRemoveButton = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleAssistRemoveButton }));
+    const interaction = makeBaseInteraction({ isButton: () => true, customId: 'assist-remove:1' });
+
+    await handle(interaction);
+
+    expect(handleAssistRemoveButton).toHaveBeenCalledWith(interaction, db);
+  });
+
+  test('routes assist-remove-select menu submissions to handleAssistRemoveSelect with the db', async () => {
+    const handleAssistRemoveSelect = jest.fn(async () => {});
+    const db = { marker: true };
+    const handle = createInteractionHandler(makeHandlers({ db, handleAssistRemoveSelect }));
+    const interaction = makeBaseInteraction({ isStringSelectMenu: () => true, customId: 'assist-remove-select:1' });
+
+    await handle(interaction);
+
+    expect(handleAssistRemoveSelect).toHaveBeenCalledWith(interaction, db);
   });
 
   test('routes edit-time-modal submissions to handleEditTimeModal with the db', async () => {

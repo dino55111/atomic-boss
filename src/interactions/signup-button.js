@@ -237,6 +237,7 @@ module.exports = {
   handleClassChoiceButton,
   handleCancelButton,
   handleCancelSelectButton,
+  resolveCancelButtonName,
   CLASS_OPTIONS,
   CLASS_EMOJIS,
 };
