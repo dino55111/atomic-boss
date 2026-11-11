@@ -10,16 +10,33 @@ describe('parseVerificationMessage', () => {
     expect(parseVerificationMessage(VALID_CONTENT)).toEqual({ gameName: '星星還沒睡' });
   });
 
-  test('returns null when a field is missing', () => {
+  test('returns null when the UID is missing', () => {
     const content = `遊戲名稱：星星還沒睡
-遊戲UID: #JUdUuB
+職業：夜使者
 最常出沒時間：每天22：00後`;
 
     expect(parseVerificationMessage(content)).toBeNull();
   });
 
+  test('matches when only the name and UID fields are filled in', () => {
+    const content = `遊戲名稱：星星還沒睡
+遊戲UID: #JUdUuB`;
+
+    expect(parseVerificationMessage(content)).toEqual({ gameName: '星星還沒睡' });
+  });
+
   test('returns null for non-string content', () => {
     expect(parseVerificationMessage(undefined)).toBeNull();
+  });
+
+  test('tolerates a space before the colon, as a real member posted', () => {
+    const content = `遊戲名稱：蘇玉喆
+遊戲UID: #qSaBM
+職業：夜使者
+最常出沒時間 : 1800-2300
+是剛回鍋的菜雞新手`;
+
+    expect(parseVerificationMessage(content)).toEqual({ gameName: '蘇玉喆' });
   });
 });
 

@@ -1,10 +1,9 @@
 // The sign-up template mixes full-width and half-width colons (「遊戲UID: 」
 // uses a half-width colon while the other fields use full-width 「：」), so
-// every field has to accept either.
-const GAME_NAME_PATTERN = /遊戲名稱[:：]\s*(.+)/;
-const GAME_UID_PATTERN = /遊戲UID[:：]\s*(.+)/;
-const CLASS_PATTERN = /職業[:：]\s*(.+)/;
-const ACTIVE_TIME_PATTERN = /最常出沒時間[:：]\s*(.+)/;
+// every field has to accept either. Members also sometimes add a space
+// before the colon (e.g. 「最常出沒時間 : 」), so that's tolerated too.
+const GAME_NAME_PATTERN = /遊戲名稱\s*[:：]\s*(.+)/;
+const GAME_UID_PATTERN = /遊戲UID\s*[:：]\s*(.+)/;
 
 function parseVerificationMessage(content) {
   if (typeof content !== 'string') {
@@ -13,9 +12,7 @@ function parseVerificationMessage(content) {
 
   const nameMatch = content.match(GAME_NAME_PATTERN);
   const uidMatch = content.match(GAME_UID_PATTERN);
-  const classMatch = content.match(CLASS_PATTERN);
-  const timeMatch = content.match(ACTIVE_TIME_PATTERN);
-  if (!nameMatch || !uidMatch || !classMatch || !timeMatch) {
+  if (!nameMatch || !uidMatch) {
     return null;
   }
 
