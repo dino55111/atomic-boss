@@ -46,7 +46,7 @@ function makeMessage(overrides = {}) {
     author: { id: 'user-1', bot: false },
     content: VALID_CONTENT,
     member: {
-      roles: { remove: jest.fn(async () => {}) },
+      roles: { remove: jest.fn(async () => {}), add: jest.fn(async () => {}) },
       setNickname: jest.fn(async () => {}),
     },
     ...overrides,
@@ -149,5 +149,40 @@ describe('createVerificationMessageHandler', () => {
     const handle = createVerificationMessageHandler('channel-1', 'role-1');
 
     await expect(handle(message)).resolves.toBeUndefined();
+  });
+
+  test('adds the configured verified role to a matching message\'s author', async () => {
+    const handle = createVerificationMessageHandler('channel-1', 'role-1', 'verified-role-1');
+    const message = makeMessage();
+
+    await handle(message);
+
+    expect(message.member.roles.add).toHaveBeenCalledWith('verified-role-1');
+  });
+
+  test('does not try to add a verified role when none is configured', async () => {
+    const handle = createVerificationMessageHandler('channel-1', 'role-1');
+    const message = makeMessage();
+
+    await handle(message);
+
+    expect(message.member.roles.add).not.toHaveBeenCalled();
+  });
+
+  test('still sets the nickname when adding the verified role fails', async () => {
+    const message = makeMessage({
+      member: {
+        roles: {
+          remove: jest.fn(async () => {}),
+          add: jest.fn(async () => { throw new Error('Missing Permissions'); }),
+        },
+        setNickname: jest.fn(async () => {}),
+      },
+    });
+    const handle = createVerificationMessageHandler('channel-1', 'role-1', 'verified-role-1');
+
+    await handle(message);
+
+    expect(message.member.setNickname).toHaveBeenCalledWith('星星還沒睡');
   });
 });

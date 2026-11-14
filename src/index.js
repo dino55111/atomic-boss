@@ -95,6 +95,7 @@ const handleGuildMemberAdd = createGuildMemberAddHandler(
 const handleVerificationMessage = createVerificationMessageHandler(
   process.env.VERIFICATION_CHANNEL_ID,
   process.env.VERIFICATION_ROLE_ID,
+  process.env.VERIFIED_ROLE_ID,
 );
 
 let reminderPollInFlight = false;

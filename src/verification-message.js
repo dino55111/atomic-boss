@@ -24,7 +24,7 @@ function parseVerificationMessage(content) {
   return { gameName };
 }
 
-function createVerificationMessageHandler(channelId, roleId) {
+function createVerificationMessageHandler(channelId, roleId, verifiedRoleId) {
   return async function handleVerificationMessage(message) {
     if (!channelId || !roleId) {
       console.log('[verification] skipped: channelId or roleId not configured');
@@ -51,6 +51,12 @@ function createVerificationMessageHandler(channelId, roleId) {
       .remove(roleId)
       .then(() => console.log(`[verification] removed role ${roleId} from ${member.id}`))
       .catch((error) => console.error(`[verification] failed to remove role from ${member.id}:`, error));
+    if (verifiedRoleId) {
+      await member.roles
+        .add(verifiedRoleId)
+        .then(() => console.log(`[verification] added role ${verifiedRoleId} to ${member.id}`))
+        .catch((error) => console.error(`[verification] failed to add role ${verifiedRoleId} to ${member.id}:`, error));
+    }
     await member
       .setNickname(parsed.gameName)
       .then(() => console.log(`[verification] set nickname for ${member.id} to ${parsed.gameName}`))
