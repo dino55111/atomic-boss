@@ -1,3 +1,4 @@
+const { ThreadAutoArchiveDuration } = require('discord.js');
 const { initDb, getEventById, createEvent, updateEventThreadId, addSignup } = require('../src/db/db');
 const {
   handleCreateEventModal,
@@ -238,7 +239,21 @@ describe('publishEvent', () => {
     await publishEvent(channel, db, event, FIXED_NOW);
 
     // 2026-07-12 is a Sunday.
-    expect(channel.startThread).toHaveBeenCalledWith({ name: '7/12 (日) 20:00 普拉 3場' });
+    expect(channel.startThread).toHaveBeenCalledWith(
+      expect.objectContaining({ name: '7/12 (日) 20:00 普拉 3場' }),
+    );
+  });
+
+  test('the thread is created with the one-week auto-archive duration', async () => {
+    const db = initDb(':memory:');
+    const event = makeUnpublishedEvent(db);
+    const channel = makeChannel();
+
+    await publishEvent(channel, db, event, FIXED_NOW);
+
+    expect(channel.startThread).toHaveBeenCalledWith(
+      expect.objectContaining({ autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek }),
+    );
   });
 
   test('includes any already-recorded signups in the posted roster', async () => {

@@ -1,3 +1,4 @@
+const { ThreadAutoArchiveDuration } = require('discord.js');
 const { createEvent, getEventById, getSignups, updateEventMessageId, updateEventThreadId, updateEventThreadMessageId } = require('../db/db');
 const { buildEventEmbed, buildActionRow, buildManagementRow } = require('../embeds/event-embed');
 const { TITLE_CAPACITIES } = require('../commands/create-event');
@@ -41,8 +42,12 @@ async function publishEvent(channel, db, event, now = new Date()) {
   const message = await channel.send({ embeds: [embed], components: [row, managementRow] });
   updateEventMessageId(db, event.id, message.id);
 
+  // Discord otherwise falls back to the parent channel's
+  // default_auto_archive_duration (usually a day), which archives an event's
+  // thread while the event itself is still days away.
   const thread = await message.startThread({
     name: `${formatStartTimeWithWeekday(event.start_time, now)} ${event.title} ${event.session}場`.slice(0, 100),
+    autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
   });
   updateEventThreadId(db, event.id, thread.id);
 
